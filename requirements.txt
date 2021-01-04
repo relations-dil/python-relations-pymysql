@@ -1,0 +1,5 @@
+git+https://github.com/gaf3/python-relations.git@gaf3/REL-30-split#egg=relations
+PyMySQL==0.10.0
+ptvsd==4.3.2
+coverage==5.2.1
+pylint==2.5.3
