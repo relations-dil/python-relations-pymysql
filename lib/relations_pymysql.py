@@ -2,7 +2,7 @@
 Module for intersting with PyMySQL
 """
 
-# pylint: disable=arguments-differ)
+# pylint: disable=arguments-differ
 
 import copy
 
