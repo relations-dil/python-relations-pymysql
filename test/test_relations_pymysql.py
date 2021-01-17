@@ -4,10 +4,10 @@ import unittest.mock
 import os
 import pymysql.cursors
 
-import relations.model
+import relations
 import relations_pymysql
 
-class SourceModel(relations.model.Model):
+class SourceModel(relations.Model):
     SOURCE = "PyMySQLSource"
 
 class Simple(SourceModel):
@@ -19,7 +19,7 @@ class Plain(SourceModel):
     simple_id = int
     name = str
 
-relations.model.OneToMany(Simple, Plain)
+relations.OneToMany(Simple, Plain)
 
 class Unit(SourceModel):
     id = int
@@ -35,8 +35,8 @@ class Case(SourceModel):
     test_id = int
     name = str
 
-relations.model.OneToMany(Unit, Test)
-relations.model.OneToOne(Test, Case)
+relations.OneToMany(Unit, Test)
+relations.OneToOne(Test, Case)
 
 class TestSource(unittest.TestCase):
 
@@ -104,7 +104,7 @@ class TestSource(unittest.TestCase):
 
     def test_model_init(self):
 
-        class Check(relations.model.Model):
+        class Check(relations.Model):
             id = int
             name = str
 
@@ -123,7 +123,7 @@ class TestSource(unittest.TestCase):
 
         # Specific
 
-        field = relations.model.Field(int, definition="id")
+        field = relations.Field(int, definition="id")
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -131,7 +131,7 @@ class TestSource(unittest.TestCase):
 
         # INTEGER
 
-        field = relations.model.Field(int, store="_id")
+        field = relations.Field(int, store="_id")
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -139,15 +139,15 @@ class TestSource(unittest.TestCase):
 
         # INTEGER default
 
-        field = relations.model.Field(int, store="_id", default=0)
+        field = relations.Field(int, store="_id", default=0)
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER DEFAULT 0"])
+        self.assertEqual(definitions, ["`_id` INTEGER NOT NULL DEFAULT 0"])
 
-        # INTEGER not_null
+        # INTEGER none
 
-        field = relations.model.Field(int, store="_id", not_null=True)
+        field = relations.Field(int, store="_id", none=False)
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -155,7 +155,7 @@ class TestSource(unittest.TestCase):
 
         # INTEGER auto_increment
 
-        field = relations.model.Field(int, store="_id", auto_increment=True)
+        field = relations.Field(int, store="_id", auto_increment=True)
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -163,7 +163,7 @@ class TestSource(unittest.TestCase):
 
         # INTEGER full
 
-        field = relations.model.Field(int, store="_id", not_null=True, auto_increment=True, default=0)
+        field = relations.Field(int, store="_id", none=False, auto_increment=True, default=0)
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -171,7 +171,7 @@ class TestSource(unittest.TestCase):
 
         # VARCHAR
 
-        field = relations.model.Field(str, name="name")
+        field = relations.Field(str, name="name")
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -179,7 +179,7 @@ class TestSource(unittest.TestCase):
 
         # VARCHAR length
 
-        field = relations.model.Field(str, name="name", length=32)
+        field = relations.Field(str, name="name", length=32)
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -187,15 +187,15 @@ class TestSource(unittest.TestCase):
 
         # VARCHAR default
 
-        field = relations.model.Field(str, name="name", default='ya')
+        field = relations.Field(str, name="name", default='ya')
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(255) DEFAULT 'ya'"])
+        self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL DEFAULT 'ya'"])
 
-        # VARCHAR not_null
+        # VARCHAR none
 
-        field = relations.model.Field(str, name="name", not_null=True)
+        field = relations.Field(str, name="name", none=False)
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -203,7 +203,7 @@ class TestSource(unittest.TestCase):
 
         # VARCHAR full
 
-        field = relations.model.Field(str, name="name", length=32, not_null=True, default='ya')
+        field = relations.Field(str, name="name", length=32, none=False, default='ya')
         self.source.field_init(field)
         definitions = []
         self.source.field_define(field, definitions)
@@ -211,7 +211,7 @@ class TestSource(unittest.TestCase):
 
     def test_model_define(self):
 
-        class Simple(relations.model.Model):
+        class Simple(relations.Model):
 
             SOURCE = "PyMySQLSource"
             DEFINITION = "whatever"
@@ -236,7 +236,7 @@ class TestSource(unittest.TestCase):
 
         # Standard
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         fields = []
         clause = []
@@ -247,7 +247,7 @@ class TestSource(unittest.TestCase):
 
         # readonly
 
-        field = relations.model.Field(int, name="id", readonly=True)
+        field = relations.Field(int, name="id", readonly=True)
         self.source.field_init(field)
         fields = []
         clause = []
@@ -285,7 +285,7 @@ class TestSource(unittest.TestCase):
 
         # IN
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter([1, 2, 3], "in")
         query = relations.query.Query()
@@ -296,7 +296,7 @@ class TestSource(unittest.TestCase):
 
         # NOT IN
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter([1, 2, 3], "ne")
         query = relations.query.Query()
@@ -307,7 +307,7 @@ class TestSource(unittest.TestCase):
 
         # =
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1)
         query = relations.query.Query()
@@ -318,7 +318,7 @@ class TestSource(unittest.TestCase):
 
         # >
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1, "gt")
         query = relations.query.Query()
@@ -329,7 +329,7 @@ class TestSource(unittest.TestCase):
 
         # >=
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1, "ge")
         query = relations.query.Query()
@@ -340,7 +340,7 @@ class TestSource(unittest.TestCase):
 
         # <
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1, "lt")
         query = relations.query.Query()
@@ -351,7 +351,7 @@ class TestSource(unittest.TestCase):
 
         # <=
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1, "le")
         query = relations.query.Query()
@@ -373,10 +373,10 @@ class TestSource(unittest.TestCase):
         Unit([["people"], ["stuff"]]).create()
 
         models = Unit.one(name__in=["people", "stuff"])
-        self.assertRaisesRegex(relations.model.ModelError, "unit: more than one retrieved", models.retrieve)
+        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
 
         model = Unit.one(name="things")
-        self.assertRaisesRegex(relations.model.ModelError, "unit: none retrieved", model.retrieve)
+        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
 
         self.assertIsNone(model.retrieve(False))
 
@@ -401,7 +401,7 @@ class TestSource(unittest.TestCase):
 
         # Standard
 
-        field = relations.model.Field(int, name="id")
+        field = relations.Field(int, name="id")
         self.source.field_init(field)
         clause = []
         values = []
@@ -422,7 +422,7 @@ class TestSource(unittest.TestCase):
 
         # readonly
 
-        field = relations.model.Field(int, name="id", readonly=True)
+        field = relations.Field(int, name="id", readonly=True)
         self.source.field_init(field)
         clause = []
         values = []
@@ -456,7 +456,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(unit.test[0].name, "moar")
 
         plain = Plain.one()
-        self.assertRaisesRegex(relations.model.ModelError, "plain: nothing to update from", plain.update)
+        self.assertRaisesRegex(relations.ModelError, "plain: nothing to update from", plain.update)
 
     def test_model_delete(self):
 
@@ -481,4 +481,4 @@ class TestSource(unittest.TestCase):
         cursor.execute(Plain.define())
 
         plain = Plain().create()
-        self.assertRaisesRegex(relations.model.ModelError, "plain: nothing to delete from", plain.delete)
+        self.assertRaisesRegex(relations.ModelError, "plain: nothing to delete from", plain.delete)
