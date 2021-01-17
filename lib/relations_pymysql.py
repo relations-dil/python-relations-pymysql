@@ -147,6 +147,14 @@ class Source(relations.Source):
         if model._id is not None:
             definitions.append(f"PRIMARY KEY (`{model._id}`)")
 
+        for unique in model._unique:
+            fields = '`,`'.join(model._unique[unique])
+            definitions.append(f"UNIQUE `{unique.replace('-', '_')}` (`{fields}`)")
+
+        for index in model._index:
+            fields = '","'.join(model._index[index])
+            definitions.append(f"INDEX `{index.replace('-', '_')}` (`{fields}`)")
+
         sep = ',\n  '
         return f"CREATE TABLE IF NOT EXISTS {self.table(model)} (\n  {sep.join(definitions)}\n)"
 

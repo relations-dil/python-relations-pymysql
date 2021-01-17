@@ -219,13 +219,17 @@ class TestSource(unittest.TestCase):
             id = int
             name = str
 
+            INDEX = "id"
+
         self.assertEqual(Simple.define(), "whatever")
 
         Simple.DEFINITION = None
         self.assertEqual(Simple.define(), """CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
   `id` INTEGER AUTO_INCREMENT,
   `name` VARCHAR(255),
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE `name` (`name`),
+  INDEX `id` (`id`)
 )""")
 
         cursor = self.source.connection.cursor()

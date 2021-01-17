@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.2.0
+VERSION?=0.2.1
 NETWORK=relations.io
 MYSQL_IMAGE=mysql/mysql-server:5.7
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
@@ -45,7 +45,7 @@ lint:
 
 verify:
 	docker run $(TTY) $(VOLUMES) $(INSTALL) sh -c "cp -r /opt/service /opt/install && cd /opt/install/ && \
-	apk update && apk add git && pip install git+https://github.com/gaf3/python-relations.git@0.2.2#egg=relations && \
+	apk update && apk add git && pip install git+https://github.com/gaf3/python-relations.git@0.2.3#egg=relations && \
 	python setup.py install && \
 	python -m relations_pymysql"
 
