@@ -122,7 +122,7 @@ class Source(relations.Source):
             if field.default is not None:
                 default = f"DEFAULT '{field.default}'"
 
-        if field.not_null:
+        if not field.none:
             definition.append("NOT NULL")
 
         if field.auto_increment:
@@ -229,14 +229,14 @@ class Source(relations.Source):
         cursor.execute(query.get(), values)
 
         if model._mode == "one" and cursor.rowcount > 1:
-            raise relations.model.ModelError(model, "more than one retrieved")
+            raise relations.ModelError(model, "more than one retrieved")
 
         if model._mode == "one" and model._role != "child":
 
             if cursor.rowcount < 1:
 
                 if verify:
-                    raise relations.model.ModelError(model, "none retrieved")
+                    raise relations.ModelError(model, "none retrieved")
                 return None
 
             model._record = model._build("update", _read=cursor.fetchone())
@@ -322,7 +322,7 @@ class Source(relations.Source):
 
         else:
 
-            raise relations.model.ModelError(model, "nothing to update from")
+            raise relations.ModelError(model, "nothing to update from")
 
         return updated
 
@@ -353,7 +353,7 @@ class Source(relations.Source):
 
         else:
 
-            raise relations.model.ModelError(model, "nothing to delete from")
+            raise relations.ModelError(model, "nothing to delete from")
 
         cursor.execute(query, values)
 
