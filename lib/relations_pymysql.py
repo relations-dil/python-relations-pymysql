@@ -106,7 +106,14 @@ class Source(relations.Source):
 
         default = None
 
-        if field.kind == int:
+        if field.kind == bool:
+
+            definition.append("TINYINT")
+
+            if field.default is not None:
+                default = f"DEFAULT {int(field.default)}"
+
+        elif field.kind == int:
 
             definition.append("INTEGER")
 
@@ -269,10 +276,13 @@ class Source(relations.Source):
         Preps values to dict (if not readonly)
         """
 
-        if not field.readonly and (changed is None or field.changed == changed):
-            clause.append(f"`{field.store}`=%s")
-            values.append(field.value)
-            field.changed = False
+        if not field.readonly:
+            if field.replace and not field.changed:
+                field.value = field.default() if callable(field.default) else field.default
+            if changed is None or field.changed == changed:
+                clause.append(f"`{field.store}`=%s")
+                values.append(field.value)
+                field.changed = False
 
     def model_update(self, model):
         """

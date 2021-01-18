@@ -19,6 +19,11 @@ class Plain(SourceModel):
     simple_id = int
     name = str
 
+class Meta(SourceModel):
+    id = int
+    name = str
+    flag = bool
+
 relations.OneToMany(Simple, Plain)
 
 class Unit(SourceModel):
@@ -128,6 +133,30 @@ class TestSource(unittest.TestCase):
         definitions = []
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["id"])
+
+        # TINYINT
+
+        field = relations.Field(bool, store="_flag")
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`_flag` TINYINT"])
+
+        # TINYINT default
+
+        field = relations.Field(bool, store="_flag", default=False)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL DEFAULT 0"])
+
+        # TINYINT none
+
+        field = relations.Field(bool, store="_flag", none=False)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL"])
 
         # INTEGER
 
@@ -267,6 +296,7 @@ class TestSource(unittest.TestCase):
         cursor = self.source.connection.cursor()
         cursor.execute(Simple.define())
         cursor.execute(Plain.define())
+        cursor.execute(Meta.define())
 
         simple.create()
 
@@ -282,6 +312,12 @@ class TestSource(unittest.TestCase):
 
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
+
+        yep = Meta("yep", True).create()
+        self.assertTrue(Meta.one(yep.id).flag)
+
+        nope = Meta("nope", False).create()
+        self.assertFalse(Meta.one(nope.id).flag)
 
         cursor.close()
 
@@ -415,8 +451,27 @@ class TestSource(unittest.TestCase):
         self.assertEqual(values, [1])
         self.assertFalse(field.changed)
 
+        # replace
+
+        field = relations.Field(int, name="id", default=-1, replace=True)
+        self.source.field_init(field)
+        clause = []
+        values = []
+        field.value = 1
+        self.source.field_update(field, clause, values)
+        self.assertEqual(clause, ['`id`=%s'])
+        self.assertEqual(values, [1])
+
+        field.changed = False
+        clause = []
+        values = []
+        self.source.field_update(field, clause, values)
+        self.assertEqual(clause, ['`id`=%s'])
+        self.assertEqual(values, [-1])
+
         # not changed
 
+        field = relations.Field(int, name="id")
         clause = []
         values = []
         self.source.field_update(field, clause, values, changed=True)
