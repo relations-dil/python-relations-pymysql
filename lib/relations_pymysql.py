@@ -5,6 +5,7 @@ Module for intersting with PyMySQL
 # pylint: disable=arguments-differ
 
 import copy
+import json
 
 import pymysql
 import pymysql.cursors
@@ -62,6 +63,28 @@ class Source(relations.Source):
         table.append(f"`{model.TABLE}`")
 
         return ".".join(table)
+
+    @staticmethod
+    def encode(model, values):
+        """
+        Encodes the fields in json if needed
+        """
+        for field in model._fields._order:
+            if values.get(field.store) is not None and field.kind in [list, dict]:
+                values[field.store] = json.dumps(values[field.store])
+
+        return values
+
+    @staticmethod
+    def decode(model, values):
+        """
+        Encodes the fields in json if needed
+        """
+        for field in model._fields._order:
+            if values.get(field.store) is not None and field.kind in [list, dict]:
+                values[field.store] = json.loads(values[field.store])
+
+        return values
 
     def field_init(self, field):
         """
@@ -129,6 +152,10 @@ class Source(relations.Source):
             if field.default is not None:
                 default = f"DEFAULT '{field.default}'"
 
+        elif field.kind in [list, dict]:
+
+            definition.append("JSON")
+
         if not field.none:
             definition.append("NOT NULL")
 
@@ -193,10 +220,12 @@ class Source(relations.Source):
 
         if model._id is not None and model._fields._names[model._id].auto_increment:
             for creating in model._each("create"):
-                cursor.execute(query, creating._record.write({}))
+                cursor.execute(query, self.encode(creating, creating._record.write({})))
                 creating[model._id] = cursor.lastrowid
         else:
-            cursor.executemany(query, [model._record.write({}) for model in model._each("create")])
+            cursor.executemany(query, [
+                self.encode(creating, creating._record.write({})) for creating in model._each("create")
+            ])
 
         cursor.close()
 
@@ -254,14 +283,14 @@ class Source(relations.Source):
                     raise relations.ModelError(model, "none retrieved")
                 return None
 
-            model._record = model._build("update", _read=cursor.fetchone())
+            model._record = model._build("update", _read=self.decode(model, cursor.fetchone()))
 
         else:
 
             model._models = []
 
             while len(model._models) < cursor.rowcount:
-                model._models.append(model.__class__(_read=cursor.fetchone()))
+                model._models.append(model.__class__(_read=self.decode(model, cursor.fetchone())))
 
             model._record = None
 
@@ -281,7 +310,10 @@ class Source(relations.Source):
                 field.value = field.default() if callable(field.default) else field.default
             if changed is None or field.changed == changed:
                 clause.append(f"`{field.store}`=%s")
-                values.append(field.value)
+                if field.kind in [list, dict] and field.value is not None:
+                    values.append(json.dumps(field.value))
+                else:
+                    values.append(field.value)
                 field.changed = False
 
     def model_update(self, model):

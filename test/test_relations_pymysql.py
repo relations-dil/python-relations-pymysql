@@ -23,6 +23,8 @@ class Meta(SourceModel):
     id = int
     name = str
     flag = bool
+    stuff = list
+    things = dict
 
 relations.OneToMany(Simple, Plain)
 
@@ -94,6 +96,88 @@ class TestSource(unittest.TestCase):
 
         model.DATABASE = "stuff"
         self.assertEqual(self.source.table(model), "`stuff`.`people`")
+
+    def test_encode(self):
+
+        model = unittest.mock.MagicMock()
+        people = unittest.mock.MagicMock()
+        stuff = unittest.mock.MagicMock()
+        things = unittest.mock.MagicMock()
+
+        people.kind = str
+        stuff.kind = list
+        things.kind = dict
+
+        people.store = "people"
+        stuff.store = "stuff"
+        things.store = "things"
+
+        model._fields._order = [people, stuff, things]
+
+        values = {
+            "people": "sure",
+            "stuff": None,
+            "things": None
+        }
+
+        self.assertEqual(self.source.encode(model, values), {
+            "people": "sure",
+            "stuff": None,
+            "things": None
+        })
+
+        values = {
+            "people": "sure",
+            "stuff": [],
+            "things": {}
+        }
+
+        self.assertEqual(self.source.encode(model, values), {
+            "people": "sure",
+            "stuff": '[]',
+            "things": '{}'
+        })
+
+    def test_decode(self):
+
+        model = unittest.mock.MagicMock()
+        people = unittest.mock.MagicMock()
+        stuff = unittest.mock.MagicMock()
+        things = unittest.mock.MagicMock()
+
+        people.kind = str
+        stuff.kind = list
+        things.kind = dict
+
+        people.store = "people"
+        stuff.store = "stuff"
+        things.store = "things"
+
+        model._fields._order = [people, stuff, things]
+
+        values = {
+            "people": "sure",
+            "stuff": None,
+            "things": None
+        }
+
+        self.assertEqual(self.source.decode(model, values), {
+            "people": "sure",
+            "stuff": None,
+            "things": None
+        })
+
+        values = {
+            "people": "sure",
+            "stuff": '[]',
+            "things": '{}'
+        }
+
+        self.assertEqual(self.source.decode(model, values), {
+            "people": "sure",
+            "stuff": [],
+            "things": {}
+        })
 
     def test_field_init(self):
 
@@ -238,6 +322,23 @@ class TestSource(unittest.TestCase):
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(32) NOT NULL DEFAULT 'ya'"])
 
+        # JSON (list)
+
+        field = relations.Field(list, name='stuff')
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ['`stuff` JSON NOT NULL'])
+
+        # JSON (dict)
+
+        field = relations.Field(dict, name='things')
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ['`things` JSON NOT NULL'])
+
+
     def test_model_define(self):
 
         class Simple(relations.Model):
@@ -313,11 +414,9 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
-        yep = Meta("yep", True).create()
-        self.assertTrue(Meta.one(yep.id).flag)
-
-        nope = Meta("nope", False).create()
-        self.assertFalse(Meta.one(nope.id).flag)
+        yep = Meta("yep", True, [1], {"a": 1}).create()
+        cursor.execute("SELECT * FROM test_source.meta")
+        self.assertEqual(cursor.fetchone(), {"id": 1, "name": "yep", "flag": True, "stuff": '[1]', "things": '{"a": 1}'})
 
         cursor.close()
 
@@ -409,6 +508,7 @@ class TestSource(unittest.TestCase):
         cursor.execute(Unit.define())
         cursor.execute(Test.define())
         cursor.execute(Case.define())
+        cursor.execute(Meta.define())
 
         Unit([["people"], ["stuff"]]).create()
 
@@ -436,6 +536,13 @@ class TestSource(unittest.TestCase):
         self.assertEqual(model[0]._record._action, "update")
         self.assertEqual(model[0].test[0].id, 1)
         self.assertEqual(model[0].test[0].case.name, "persons")
+
+        Meta("yep", True, [1], {"a": 1}).create()
+        model = Meta.one(name="yep")
+
+        self.assertEqual(model.flag, True)
+        self.assertEqual(model.stuff, [1])
+        self.assertEqual(model.things, {"a": 1})
 
     def test_field_update(self):
 
@@ -497,6 +604,7 @@ class TestSource(unittest.TestCase):
         cursor.execute(Unit.define())
         cursor.execute(Test.define())
         cursor.execute(Case.define())
+        cursor.execute(Meta.define())
 
         Unit([["people"], ["stuff"]]).create()
 
@@ -513,6 +621,14 @@ class TestSource(unittest.TestCase):
         self.assertEqual(unit.name, "thing")
         self.assertEqual(unit.test[0].id, 1)
         self.assertEqual(unit.test[0].name, "moar")
+
+        Meta("yep", True, [1], {"a": 1}).create()
+        Meta.one(name="yep").set(flag=False, stuff=[], things={}).update()
+
+        model = Meta.one(name="yep")
+        self.assertEqual(model.flag, False)
+        self.assertEqual(model.stuff, [])
+        self.assertEqual(model.things, {})
 
         plain = Plain.one()
         self.assertRaisesRegex(relations.ModelError, "plain: nothing to update from", plain.update)
