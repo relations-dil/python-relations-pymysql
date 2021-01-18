@@ -356,7 +356,7 @@ class TestSource(unittest.TestCase):
         Simple.DEFINITION = None
         self.assertEqual(Simple.define(), """CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
   `id` INTEGER AUTO_INCREMENT,
-  `name` VARCHAR(255),
+  `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`),
   INDEX `id` (`id`)
@@ -655,5 +655,5 @@ class TestSource(unittest.TestCase):
 
         cursor.execute(Plain.define())
 
-        plain = Plain().create()
+        plain = Plain(0, "nope").create()
         self.assertRaisesRegex(relations.ModelError, "plain: nothing to delete from", plain.delete)
