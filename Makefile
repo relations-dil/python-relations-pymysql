@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.2.2
+VERSION?=0.2.3
 NETWORK=relations.io
 MYSQL_IMAGE=mysql/mysql-server:5.7
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
@@ -18,7 +18,7 @@ ENVIRONMENT=-e MYSQL_HOST=$(MYSQL_HOST) \
 			-e PYTHONUNBUFFERED=1 \
 			-e test="python -m unittest -v" \
 			-e debug="python -m ptvsd --host 0.0.0.0 --port 5678 --wait -m unittest -v"
-.PHONY: build network mysql shell debug test lint verify tag untag
+.PHONY: build network mysql shell debug test lint setup tag untag
 
 build:
 	docker build . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
@@ -43,9 +43,9 @@ test: mysql
 lint:
 	docker run $(TTY) $(VOLUMES) $(ENVIRONMENT) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "pylint --rcfile=.pylintrc lib/"
 
-verify:
+setup:
 	docker run $(TTY) $(VOLUMES) $(INSTALL) sh -c "cp -r /opt/service /opt/install && cd /opt/install/ && \
-	apk update && apk add git && pip install git+https://github.com/gaf3/python-relations.git@0.2.5#egg=relations && \
+	apk update && apk add git && pip install git+https://github.com/gaf3/python-relations.git@0.2.6#egg=relations && \
 	python setup.py install && \
 	python -m relations_pymysql"
 
