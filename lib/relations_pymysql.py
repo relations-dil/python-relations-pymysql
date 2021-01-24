@@ -133,14 +133,14 @@ class Source(relations.Source):
 
             definition.append("TINYINT")
 
-            if field.default is not None:
+            if field.default is not None and not callable(field.default):
                 default = f"DEFAULT {int(field.default)}"
 
         elif field.kind == int:
 
             definition.append("INTEGER")
 
-            if field.default is not None:
+            if field.default is not None and not callable(field.default):
                 default = f"DEFAULT {field.default}"
 
         elif field.kind == str:
@@ -149,7 +149,7 @@ class Source(relations.Source):
 
             definition.append(f"VARCHAR({length})")
 
-            if field.default is not None:
+            if field.default is not None and not callable(field.default):
                 default = f"DEFAULT '{field.default}'"
 
         elif field.kind in [list, dict]:
