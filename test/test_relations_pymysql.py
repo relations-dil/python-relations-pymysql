@@ -210,6 +210,9 @@ class TestSource(unittest.TestCase):
 
     def test_field_define(self):
 
+        def deffer():
+            pass
+
         # Specific
 
         field = relations.Field(int, definition="id")
@@ -234,6 +237,14 @@ class TestSource(unittest.TestCase):
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL DEFAULT 0"])
 
+        # TINYINT function default
+
+        field = relations.Field(bool, store="_flag", default=deffer)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL"])
+
         # TINYINT none
 
         field = relations.Field(bool, store="_flag", none=False)
@@ -257,6 +268,14 @@ class TestSource(unittest.TestCase):
         definitions = []
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER NOT NULL DEFAULT 0"])
+
+        # INTEGER function default
+
+        field = relations.Field(int, store="_id", default=deffer)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`_id` INTEGER NOT NULL"])
 
         # INTEGER none
 
@@ -305,6 +324,14 @@ class TestSource(unittest.TestCase):
         definitions = []
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL DEFAULT 'ya'"])
+
+        # VARCHAR function default
+
+        field = relations.Field(str, name="name", default=deffer)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL"])
 
         # VARCHAR none
 
