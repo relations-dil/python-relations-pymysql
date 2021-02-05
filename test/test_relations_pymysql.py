@@ -23,6 +23,7 @@ class Meta(SourceModel):
     id = int
     name = str
     flag = bool
+    spend = float
     stuff = list
     things = dict
 
@@ -301,6 +302,38 @@ class TestSource(unittest.TestCase):
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER NOT NULL AUTO_INCREMENT DEFAULT 0"])
 
+        # FLOAT
+
+        field = relations.Field(float, store="spend")
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`spend` DOUBLE"])
+
+        # FLOAT default
+
+        field = relations.Field(float, store="spend", default=0.1)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL DEFAULT 0.1"])
+
+        # FLOAT function default
+
+        field = relations.Field(float, store="spend", default=deffer)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL"])
+
+        # FLOAT none
+
+        field = relations.Field(float, store="spend", none=False)
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL"])
+
         # VARCHAR
 
         field = relations.Field(str, name="name")
@@ -441,9 +474,9 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
-        yep = Meta("yep", True, [1], {"a": 1}).create()
+        yep = Meta("yep", True, 1.1, [1], {"a": 1}).create()
         cursor.execute("SELECT * FROM test_source.meta")
-        self.assertEqual(cursor.fetchone(), {"id": 1, "name": "yep", "flag": True, "stuff": '[1]', "things": '{"a": 1}'})
+        self.assertEqual(cursor.fetchone(), {"id": 1, "name": "yep", "flag": True, "spend": 1.1, "stuff": '[1]', "things": '{"a": 1}'})
 
         cursor.close()
 
@@ -564,10 +597,11 @@ class TestSource(unittest.TestCase):
         self.assertEqual(model[0].test[0].id, 1)
         self.assertEqual(model[0].test[0].case.name, "persons")
 
-        Meta("yep", True, [1], {"a": 1}).create()
+        Meta("yep", True, 1.1, [1], {"a": 1}).create()
         model = Meta.one(name="yep")
 
         self.assertEqual(model.flag, True)
+        self.assertEqual(model.spend, 1.1)
         self.assertEqual(model.stuff, [1])
         self.assertEqual(model.things, {"a": 1})
 
@@ -649,11 +683,12 @@ class TestSource(unittest.TestCase):
         self.assertEqual(unit.test[0].id, 1)
         self.assertEqual(unit.test[0].name, "moar")
 
-        Meta("yep", True, [1], {"a": 1}).create()
+        Meta("yep", True, 1.1, [1], {"a": 1}).create()
         Meta.one(name="yep").set(flag=False, stuff=[], things={}).update()
 
         model = Meta.one(name="yep")
         self.assertEqual(model.flag, False)
+        self.assertEqual(model.spend, 1.1)
         self.assertEqual(model.stuff, [])
         self.assertEqual(model.things, {})
 

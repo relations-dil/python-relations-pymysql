@@ -143,6 +143,13 @@ class Source(relations.Source):
             if field.default is not None and not callable(field.default):
                 default = f"DEFAULT {field.default}"
 
+        elif field.kind == float:
+
+            definition.append("DOUBLE")
+
+            if field.default is not None and not callable(field.default):
+                default = f"DEFAULT {field.default}"
+
         elif field.kind == str:
 
             length = field.length if field.length is not None else 255
