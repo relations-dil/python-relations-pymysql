@@ -116,7 +116,7 @@ class Source(relations.Source):
             model._fields._names[model._id].auto_increment = True
             model._fields._names[model._id].readonly = True
 
-    def field_define(self, field, definitions):
+    def field_define(self, field, definitions): # pylint: disable=too-many-branches
         """
         Add what this field is the definition
         """
@@ -139,6 +139,13 @@ class Source(relations.Source):
         elif field.kind == int:
 
             definition.append("INTEGER")
+
+            if field.default is not None and not callable(field.default):
+                default = f"DEFAULT {field.default}"
+
+        elif field.kind == float:
+
+            definition.append("DOUBLE")
 
             if field.default is not None and not callable(field.default):
                 default = f"DEFAULT {field.default}"
