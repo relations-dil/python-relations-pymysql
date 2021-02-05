@@ -116,7 +116,7 @@ class Source(relations.Source):
             model._fields._names[model._id].auto_increment = True
             model._fields._names[model._id].readonly = True
 
-    def field_define(self, field, definitions):
+    def field_define(self, field, definitions): # pylint: disable=too-many-branches
         """
         Add what this field is the definition
         """
