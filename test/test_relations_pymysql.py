@@ -83,6 +83,11 @@ class TestSource(unittest.TestCase):
     @unittest.mock.patch("pymysql.connect", unittest.mock.MagicMock())
     def test___del__(self):
 
+        source = relations_pymysql.Source("test", "init", host="db.com", extra="stuff")
+        source.connection = None
+        del relations.SOURCES["test"]
+        pymysql.connect.return_value.close.assert_not_called()
+
         relations_pymysql.Source("test", "init", host="db.com", extra="stuff")
         del relations.SOURCES["test"]
         pymysql.connect.return_value.close.assert_called_once_with()
