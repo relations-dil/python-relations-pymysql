@@ -476,6 +476,12 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.simple")
         self.assertEqual(cursor.fetchone(), {"id": 1, "name": "sure"})
 
+        simples = Simple.bulk().add("ya").create()
+        self.assertEqual(simples._models, [])
+
+        cursor.execute("SELECT * FROM test_source.simple WHERE name='ya'")
+        self.assertEqual(cursor.fetchone(), {"id": 2, "name": "ya"})
+
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
