@@ -225,7 +225,7 @@ class Source(relations.Source):
 
         query = f"INSERT INTO {self.table(model)} ({','.join(fields)}) VALUES({','.join(clause)})"
 
-        if model._id is not None and model._fields._names[model._id].auto_increment:
+        if not model._bulk and model._id is not None and model._fields._names[model._id].auto_increment:
             for creating in model._each("create"):
                 cursor.execute(query, self.encode(creating, creating._record.write({})))
                 creating[model._id] = cursor.lastrowid
@@ -236,14 +236,20 @@ class Source(relations.Source):
 
         cursor.close()
 
-        for creating in model._each("create"):
-            for parent_child in creating.CHILDREN:
-                if creating._children.get(parent_child):
-                    creating._children[parent_child].create()
-            creating._action = "update"
-            creating._record._action = "update"
+        if not model._bulk:
 
-        model._action = "update"
+            for creating in model._each("create"):
+                for parent_child in creating.CHILDREN:
+                    if creating._children.get(parent_child):
+                        creating._children[parent_child].create()
+                creating._action = "update"
+                creating._record._action = "update"
+
+            model._action = "update"
+
+        else:
+
+            model._models = []
 
         return model
 
