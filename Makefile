@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.4.0
+VERSION?=0.4.1
 NETWORK=relations.io
 MYSQL_IMAGE=mysql/mysql-server:5.7
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
@@ -21,7 +21,7 @@ ENVIRONMENT=-e MYSQL_HOST=$(MYSQL_HOST) \
 .PHONY: build network mysql shell debug test lint setup tag untag
 
 build:
-	docker build . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
+	docker build --no-cache . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
 
 network:
 	-docker network create $(NETWORK)
