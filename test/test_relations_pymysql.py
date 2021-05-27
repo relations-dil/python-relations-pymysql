@@ -501,7 +501,7 @@ class TestSource(unittest.TestCase):
         field.filter([1, 2, 3], "in")
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id` IN (%s,%s,%s)")
         self.assertEqual(values, [1, 2, 3])
 
@@ -512,7 +512,7 @@ class TestSource(unittest.TestCase):
         field.filter([1, 2, 3], "ne")
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id` NOT IN (%s,%s,%s)")
         self.assertEqual(values, [1, 2, 3])
 
@@ -523,9 +523,53 @@ class TestSource(unittest.TestCase):
         field.filter(1, 'like')
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, '`id` LIKE %s')
         self.assertEqual(values, ["%1%"])
+
+        # NOT LIKE
+
+        field = relations.Field(int, name='id')
+        self.source.field_init(field)
+        field.filter(1, 'notlike')
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, '`id` NOT LIKE %s')
+        self.assertEqual(values, ["%1%"])
+
+        # IS NULL
+
+        field = relations.Field(int, name='id')
+        self.source.field_init(field)
+        field.filter(True, 'null')
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, '`id` IS NULL')
+        self.assertEqual(values, [])
+
+        # IS NOT NULL
+
+        field = relations.Field(int, name='id')
+        self.source.field_init(field)
+        field.filter(False, 'null')
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, '`id` IS NOT NULL')
+        self.assertEqual(values, [])
+
+        # JSON
+
+        field = relations.Field(dict, name='meta')
+        self.source.field_init(field)
+        field.filter(1, 'a__b__0___1')
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, "`meta`->>%s=%s")
+        self.assertEqual(values, ['$.a.b[0]."1"', 1])
 
         # =
 
@@ -534,7 +578,7 @@ class TestSource(unittest.TestCase):
         field.filter(1)
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id`=%s")
         self.assertEqual(values, [1])
 
@@ -545,7 +589,7 @@ class TestSource(unittest.TestCase):
         field.filter(1, "gt")
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id`>%s")
         self.assertEqual(values, [1])
 
@@ -556,7 +600,7 @@ class TestSource(unittest.TestCase):
         field.filter(1, "gte")
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id`>=%s")
         self.assertEqual(values, [1])
 
@@ -567,7 +611,7 @@ class TestSource(unittest.TestCase):
         field.filter(1, "lt")
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id`<%s")
         self.assertEqual(values, [1])
 
@@ -578,7 +622,7 @@ class TestSource(unittest.TestCase):
         field.filter(1, "lte")
         query = relations.query.Query()
         values = []
-        self.source.field_retrieve( field, query, values)
+        self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id`<=%s")
         self.assertEqual(values, [1])
 
@@ -726,6 +770,35 @@ class TestSource(unittest.TestCase):
         self.assertEqual(Unit.many().sort("-name").limit(1, 1).name, ["people"])
         self.assertEqual(Unit.many().sort("-name").limit(0).name, [])
         self.assertEqual(Unit.many(name="people").limit(1).name, ["people"])
+
+        Meta("dive", stuff=[1, 2, 3], things={"a": {"b": [1], "c": "sure"}, "4": 5}).create()
+
+        model = Meta.many(stuff__1=2)
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(things__a__b__0=1)
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(things__a__c__like="su")
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(things__a__d__null=True)
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(things___4=5)
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(things__a__b__0__gt=1)
+        self.assertEqual(len(model), 0)
+
+        model = Meta.many(things__a__c__notlike="su")
+        self.assertEqual(len(model), 0)
+
+        model = Meta.many(things__a__d__null=False)
+        self.assertEqual(len(model), 0)
+
+        model = Meta.many(things___4=6)
+        self.assertEqual(len(model), 0)
 
     def test_model_labels(self):
 
