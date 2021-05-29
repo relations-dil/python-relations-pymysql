@@ -335,7 +335,7 @@ class Source(relations.Source):
             for relation in model.PARENTS.values():
                 if field.name == relation.child_field:
                     parent = relation.Parent.many(like=model._like).limit(model._chunk)
-                    ors.append(f'`{field.store}` IN ({",".join(["%s" for each in parent[relation.parent_field]])})')
+                    ors.append(f'`{field.store}` IN ({",".join(["%s" for _ in parent[relation.parent_field]])})')
                     values.extend(parent[relation.parent_field])
                     model.overflow = model.overflow or parent.overflow
 
