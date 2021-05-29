@@ -71,7 +71,7 @@ class Source(relations.Source):
         Encodes the fields in json if needed
         """
         for field in model._fields._order:
-            if values.get(field.store) is not None and field.kind in [list, dict]:
+            if values.get(field.store) is not None and field.kind not in [bool, int, float, str]:
                 values[field.store] = json.dumps(values[field.store])
 
         return values
@@ -82,7 +82,7 @@ class Source(relations.Source):
         Encodes the fields in json if needed
         """
         for field in model._fields._order:
-            if values.get(field.store) is not None and field.kind in [list, dict]:
+            if values.get(field.store) is not None and field.kind not in [bool, int, float, str]:
                 values[field.store] = json.loads(values[field.store])
 
         return values
@@ -160,7 +160,7 @@ class Source(relations.Source):
             if field.default is not None and not callable(field.default):
                 default = f"DEFAULT '{field.default}'"
 
-        elif field.kind in [list, dict]:
+        else:
 
             definition.append("JSON")
 
@@ -254,6 +254,28 @@ class Source(relations.Source):
 
         return model
 
+    @staticmethod
+    def branch_retrieve(branch):
+        """
+        Generates the JSON pathing for a field
+        """
+
+        if isinstance(branch, str):
+            branch = branch.split('__')
+
+        leaves = []
+
+        for leaf in branch:
+
+            if relations.INDEX.match(leaf):
+                leaves.append(f"[{int(leaf)}]")
+            elif leaf[0] == '_':
+                leaves.append(f'."{leaf[1:]}"')
+            else:
+                leaves.append(f".{leaf}")
+
+        return f"${''.join(leaves)}"
+
     def field_retrieve(self, field, query, values): # pylint: disable=too-many-branches
         """
         Adds where caluse to query
@@ -264,19 +286,10 @@ class Source(relations.Source):
             if operator not in relations.Field.OPERATORS:
 
                 store = []
-                path = operator.split("__")
-                operator = path.pop()
+                branch = operator.split("__")
+                operator = branch.pop()
 
-                for place in path:
-
-                    if re.match(r'^\d+$', place):
-                        store.append(f"[{int(place)}]")
-                    elif place[0] == '_':
-                        store.append(f'."{place[1:]}"')
-                    else:
-                        store.append(f".{place}")
-
-                values.append(f"${''.join(store)}")
+                values.append(self.branch_retrieve(branch))
                 store = f"`{field.store}`->>%s"
 
             else:
@@ -314,6 +327,9 @@ class Source(relations.Source):
 
         for name in model._label:
 
+            branch = name.split("__", 1)
+            name = branch.pop(0)
+
             field = model._fields._names[name]
 
             parent = False
@@ -327,8 +343,20 @@ class Source(relations.Source):
 
             if not parent:
 
-                ors.append(f'`{field.store}` LIKE %s')
-                values.append(f"%{model._like}%")
+                branches = [branch] if branch else field.label
+
+                if branches:
+
+                    for branch in branches:
+
+                        ors.append(f"`{field.store}`->>%s LIKE %s")
+                        values.append(Source.branch_retrieve(branch))
+                        values.append(f"%{model._like}%")
+
+                else:
+
+                    ors.append(f'`{field.store}` LIKE %s')
+                    values.append(f"%{model._like}%")
 
         query.add(wheres="(%s)" % " OR ".join(ors))
 
