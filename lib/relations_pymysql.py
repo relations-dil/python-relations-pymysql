@@ -3,8 +3,6 @@ Module for intersting with PyMySQL
 """
 
 # pylint: disable=arguments-differ
-
-import re
 import copy
 import json
 
