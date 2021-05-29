@@ -283,7 +283,6 @@ class Source(relations.Source):
 
             if operator not in relations.Field.OPERATORS:
 
-                store = []
                 path = operator.split("__")
                 operator = path.pop()
 
