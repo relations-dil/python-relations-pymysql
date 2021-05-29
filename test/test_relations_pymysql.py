@@ -5,6 +5,8 @@ import os
 import copy
 import pymysql.cursors
 
+import ipaddress
+
 import relations
 import relations_pymysql
 
@@ -20,6 +22,8 @@ class Plain(SourceModel):
     simple_id = int
     name = str
 
+relations.OneToMany(Simple, Plain)
+
 class Meta(SourceModel):
     id = int
     name = str
@@ -28,7 +32,25 @@ class Meta(SourceModel):
     stuff = list
     things = dict
 
-relations.OneToMany(Simple, Plain)
+def subnet_attr(values, value):
+
+    values["address"] = str(value)
+    min_ip = value[0]
+    max_ip = value[-1]
+    values["min_address"] = str(min_ip)
+    values["min_value"] = int(min_ip)
+    values["max_address"] = str(max_ip)
+    values["max_value"] = int(max_ip)
+
+class Net(SourceModel):
+
+    id = int
+    name = str
+    ip = ipaddress.IPv4Address, {"attr": {"compressed": "address", "__int__": "value"}, "init": "address", "label": "address"}
+    subnet = ipaddress.IPv4Network, {"attr": subnet_attr, "init": "address", "label": "address"}
+
+    LABEL = ["ip"]
+    UNIQUE = False
 
 class Unit(SourceModel):
     id = int
@@ -404,6 +426,14 @@ class TestSource(unittest.TestCase):
         self.source.field_define(field, definitions)
         self.assertEqual(definitions, ['`things` JSON NOT NULL'])
 
+        # JSON (anything)
+
+        field = relations.Field(ipaddress.IPv4Address, name='ip', attr="whatev")
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, ['`ip` JSON'])
+
 
     def test_model_define(self):
 
@@ -491,6 +521,10 @@ class TestSource(unittest.TestCase):
         self.assertEqual(cursor.fetchone(), {"id": 1, "name": "yep", "flag": True, "spend": 1.1, "stuff": '[1]', "things": '{"a": 1}'})
 
         cursor.close()
+
+    def test_path_retrieve(self):
+
+        self.assertEqual(self.source.path_retrieve("a__b__0___1"), '$.a.b[0]."1"')
 
     def test_field_retrieve(self):
 
@@ -634,6 +668,7 @@ class TestSource(unittest.TestCase):
         cursor.execute(Test.define())
         cursor.execute(Case.define())
         cursor.execute(Meta.define())
+        cursor.execute(Net.define())
 
         Unit([["stuff"], ["people"]]).create()
 
@@ -671,6 +706,23 @@ class TestSource(unittest.TestCase):
         self.assertEqual(query.wheres, '(`unit_id` IN (%s) OR `name` LIKE %s)')
         self.assertEqual(values, [unit.id, '%p%'])
         self.assertTrue(test.overflow)
+
+        class Nut(SourceModel):
+
+            id = int
+            name = str
+            ip = ipaddress.IPv4Address, {"attr": {"compressed": "address", "__int__": "value"}, "init": "address", "label": "value"}
+            subnet = ipaddress.IPv4Network, {"attr": subnet_attr, "init": "address", "label": "address"}
+
+            LABEL = ["ip", "subnet__min_address"]
+            UNIQUE = False
+
+        net = Nut.many(like="p")
+        query = copy.deepcopy(net.QUERY)
+        values = []
+        self.source.model_like(net, query, values)
+        self.assertEqual(query.wheres, '(`ip`->>%s LIKE %s OR `subnet`->>%s LIKE %s)')
+        self.assertEqual(values, ['$.value', '%p%', '$.min_address', '%p%'])
 
     def test_model_sort(self):
 
@@ -718,6 +770,7 @@ class TestSource(unittest.TestCase):
         cursor.execute(Test.define())
         cursor.execute(Case.define())
         cursor.execute(Meta.define())
+        cursor.execute(Net.define())
 
         Unit([["stuff"], ["people"]]).create()
 
@@ -800,6 +853,36 @@ class TestSource(unittest.TestCase):
         model = Meta.many(things___4=6)
         self.assertEqual(len(model), 0)
 
+        Net("crawl", ip="1.2.3.4", subnet="1.2.3.0/24").create()
+        Net("web").create()
+
+        model = Net.many(like='1.2.3.')
+        self.assertEqual(model[0].name, "crawl")
+
+        model = Net.many(ip__address__like='1.2.3.')
+        self.assertEqual(model[0].name, "crawl")
+
+        model = Net.many(ip__value__gt=int(ipaddress.IPv4Address('1.2.3.0')))
+        self.assertEqual(model[0].name, "crawl")
+
+        model = Net.many(subnet__address__like='1.2.3.')
+        self.assertEqual(model[0].name, "crawl")
+
+        model = Net.many(subnet__min_value=int(ipaddress.IPv4Address('1.2.3.0')))
+        self.assertEqual(model[0].name, "crawl")
+
+        model = Net.many(ip__address__notlike='1.2.3.')
+        self.assertEqual(len(model), 0)
+
+        model = Net.many(ip__value__lt=int(ipaddress.IPv4Address('1.2.3.0')))
+        self.assertEqual(len(model), 0)
+
+        model = Net.many(subnet__address__notlike='1.2.3.')
+        self.assertEqual(len(model), 0)
+
+        model = Net.many(subnet__max_value=int(ipaddress.IPv4Address('1.2.3.0')))
+        self.assertEqual(len(model), 0)
+
     def test_model_labels(self):
 
         cursor = self.source.connection.cursor()
@@ -808,6 +891,7 @@ class TestSource(unittest.TestCase):
         cursor.execute(Test.define())
         cursor.execute(Case.define())
         cursor.execute(Meta.define())
+        cursor.execute(Net.define())
 
         Unit("people").create().test.add("stuff").add("things").create()
 
@@ -837,6 +921,12 @@ class TestSource(unittest.TestCase):
         self.assertEqual(labels.labels, {
             1: ["people", "stuff"],
             2: ["people", "things"]
+        })
+
+        Net("crawl", ip="1.2.3.4", subnet="1.2.3.0/24").create()
+
+        self.assertEqual(Net.many().labels().labels, {
+            1: ["1.2.3.4"]
         })
 
     def test_field_update(self):
