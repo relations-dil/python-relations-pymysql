@@ -536,7 +536,7 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
-        yep = Meta("yep", True, 3.50, [1], {"for": [{"1": "yep"}]}).create()
+        Meta("yep", True, 3.50, [1], {"for": [{"1": "yep"}]}).create()
         cursor.execute("SELECT * FROM test_source.meta")
         self.assertEqual(cursor.fetchone(), {"id": 1, "name": "yep", "flag": True, "spend": 3.50, "stuff": '[1]', "things": '{"for": [{"1": "yep"}]}', "pull": "yep"})
 
