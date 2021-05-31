@@ -1045,6 +1045,7 @@ class TestSource(unittest.TestCase):
         cursor.execute(Test.define())
         cursor.execute(Case.define())
         cursor.execute(Meta.define())
+        cursor.execute(Net.define())
 
         Unit([["people"], ["stuff"]]).create()
 
@@ -1086,6 +1087,18 @@ class TestSource(unittest.TestCase):
 
         self.assertEqual(Meta.one(dive.id).pull, "um")
         self.assertEqual(Meta.one(swim.id).pull, "nah")
+
+        ping = Net(ip="1.2.3.4", subnet="1.2.3.0/24").create()
+        pong = Net(ip="5.6.7.8", subnet="5.6.7.0/24").create()
+
+        Net.many().set(subnet="9.10.11.0/24").update()
+
+        self.assertEqual(Net.one(ping.id).subnet.compressed, "9.10.11.0/24")
+        self.assertEqual(Net.one(pong.id).subnet.compressed, "9.10.11.0/24")
+
+        Net.one(ping.id).set(ip="13.14.15.16").update()
+        self.assertEqual(Net.one(ping.id).ip.compressed, "13.14.15.16")
+        self.assertEqual(Net.one(pong.id).ip.compressed, "5.6.7.8")
 
     def test_model_delete(self):
 
