@@ -563,7 +563,7 @@ class TestSource(unittest.TestCase):
             "flag": 1,
             "spend": 3.50,
             "stuff": '[1, [null, null, null, null, {"1": "sure"}]]',
-            "things": '{"for": [{"1": "yep"}]}', "pull": "yep",
+            "things": '{"for": [{"1": "yep"}]}',
             "pull": "yep"
         })
 
