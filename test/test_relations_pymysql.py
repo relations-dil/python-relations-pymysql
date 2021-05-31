@@ -32,7 +32,7 @@ class Meta(SourceModel):
     stuff = list
     things = dict
     pull = str, {"extract": "things__for__0___1"}
-    push = str, {"inject": "stuff__-1__4___1"}
+    push = str, {"inject": "stuff__-1__relations.io___1"}
 
 def subnet_attr(values, value):
 
@@ -562,7 +562,7 @@ class TestSource(unittest.TestCase):
             "name": "yep",
             "flag": 1,
             "spend": 3.50,
-            "stuff": '[1, [null, null, null, null, {"1": "sure"}]]',
+            "stuff": '[1, {"relations.io": {"1": "sure"}}]',
             "things": '{"for": [{"1": "yep"}]}',
             "pull": "yep"
         })
@@ -858,7 +858,7 @@ class TestSource(unittest.TestCase):
 
         self.assertEqual(model.flag, True)
         self.assertEqual(model.spend, 1.1)
-        self.assertEqual(model.stuff, [1, [None, None, None, None, {"1": None}]])
+        self.assertEqual(model.stuff, [1, {"relations.io": {"1": None}}])
         self.assertEqual(model.things, {"a": 1})
 
         self.assertEqual(Unit.many().name, ["people", "stuff"])
