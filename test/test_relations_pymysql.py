@@ -805,6 +805,22 @@ class TestSource(unittest.TestCase):
         self.assertEqual(query.limits, '%s, %s')
         self.assertEqual(values, [1, 2])
 
+    def test_model_count(self):
+
+        cursor = self.source.connection.cursor()
+
+        cursor.execute(Unit.define())
+        cursor.execute(Test.define())
+        cursor.execute(Case.define())
+
+        Unit([["stuff"], ["people"]]).create()
+
+        self.assertEqual(Unit.many().count(), 2)
+
+        self.assertEqual(Unit.many(name="people").count(), 1)
+
+        self.assertEqual(Unit.many(like="p").count(), 1)
+
     def test_model_retrieve(self):
 
         cursor = self.source.connection.cursor()
