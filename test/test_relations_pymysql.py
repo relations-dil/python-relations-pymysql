@@ -249,7 +249,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(model.QUERY.get(), "SELECT * FROM `test_source`.`check`")
         self.assertIsNone(model.DEFINITION)
         self.assertTrue(model._fields._names["id"].auto_increment)
-        self.assertTrue(model._fields._names["id"].readonly)
+        self.assertTrue(model._fields._names["id"].auto)
 
     def test_field_define(self):
 
@@ -504,9 +504,9 @@ class TestSource(unittest.TestCase):
         self.assertEqual(clause, ["%(id)s"])
         self.assertFalse(field.changed)
 
-        # readonly
+        # auto
 
-        field = relations.Field(int, name="id", readonly=True)
+        field = relations.Field(int, name="id", auto=True)
         self.source.field_init(field)
         fields = []
         clause = []
@@ -997,59 +997,27 @@ class TestSource(unittest.TestCase):
         self.source.field_init(field)
         clause = []
         values = []
-        field.value = 1
-        self.source.field_update(field, clause, values)
-        self.assertEqual(clause, ["`id`=%s"])
-        self.assertEqual(values, [1])
-        self.assertFalse(field.changed)
-
-        # replace
-
-        field = relations.Field(int, name="id", default=-1, replace=True)
-        self.source.field_init(field)
-        clause = []
-        values = []
-        field.value = 1
-        self.source.field_update(field, clause, values)
+        self.source.field_update(field, {"id": 1}, clause, values)
         self.assertEqual(clause, ['`id`=%s'])
         self.assertEqual(values, [1])
 
-        field.changed = False
+        # Non standard
+
+        field = relations.Field(dict, name="id")
+        self.source.field_init(field)
         clause = []
         values = []
-        self.source.field_update(field, clause, values)
+        self.source.field_update(field, {"id": {"a": 1}}, clause, values)
         self.assertEqual(clause, ['`id`=%s'])
-        self.assertEqual(values, [-1])
+        self.assertEqual(values, ['{"a": 1}'])
 
-        # not changed
+        # Non existent
 
-        field = relations.Field(int, name="id")
-        clause = []
-        values = []
-        self.source.field_update(field, clause, values, changed=True)
-        self.assertEqual(clause, [])
-        self.assertEqual(values, [])
-        self.assertFalse(field.changed)
-
-        # readonly
-
-        field = relations.Field(int, name="id", readonly=True)
+        field = relations.Field(dict, name="id")
         self.source.field_init(field)
         clause = []
         values = []
-        field.value = 1
-        self.source.field_update( field, clause, values)
-        self.assertEqual(clause, [])
-        self.assertEqual(values, [])
-
-        # inject
-
-        field = relations.Field(int, name="id", inject=True)
-        self.source.field_init(field)
-        clause = []
-        values = []
-        field.value = 1
-        self.source.field_update( field, clause, values)
+        self.source.field_update(field, {}, clause, values)
         self.assertEqual(clause, [])
         self.assertEqual(values, [])
 
