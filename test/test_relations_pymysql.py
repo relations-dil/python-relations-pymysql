@@ -30,8 +30,7 @@ class Meta(SourceModel):
     flag = bool
     spend = float
     stuff = list
-    things = dict
-    pull = str, {"extract": "things__for__0___1"}
+    things = dict, {"extract": "for__0___1"}
     push = str, {"inject": "stuff__-1__relations.io___1"}
 
 def subnet_attr(values, value):
@@ -47,12 +46,11 @@ def subnet_attr(values, value):
 class Net(SourceModel):
 
     id = int
-    ip_address = str, {"extract": "ip__address"}
-    ip_value = int, {"extract": "ip__value"}
     ip = ipaddress.IPv4Address, {
         "attr": {"compressed": "address", "__int__": "value"},
         "init": "address",
-        "label": "address"
+        "label": "address",
+        "extract": {"address": str, "value": int}
     }
     subnet = ipaddress.IPv4Network, {
         "attr": subnet_attr,
@@ -60,7 +58,8 @@ class Net(SourceModel):
         "label": "address"
     }
 
-    INDEX = "ip_value"
+    LABEL = "ip__address"
+    INDEX = "ip__value"
 
 class Unit(SourceModel):
     id = int
@@ -261,7 +260,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, definition="id")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["id"])
 
         # TINYINT
@@ -269,7 +268,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(bool, store="_flag")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_flag` TINYINT"])
 
         # TINYINT default
@@ -277,7 +276,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(bool, store="_flag", default=False)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL DEFAULT 0"])
 
         # TINYINT function default
@@ -285,7 +284,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(bool, store="_flag", default=deffer)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL"])
 
         # TINYINT none
@@ -293,7 +292,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(bool, store="_flag", none=False)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL"])
 
         # INTEGER
@@ -301,7 +300,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, store="_id")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER"])
 
         # INTEGER default
@@ -309,7 +308,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, store="_id", default=0)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER NOT NULL DEFAULT 0"])
 
         # INTEGER function default
@@ -317,7 +316,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, store="_id", default=deffer)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER NOT NULL"])
 
         # INTEGER none
@@ -325,7 +324,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, store="_id", none=False)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER NOT NULL"])
 
         # INTEGER auto_increment
@@ -333,7 +332,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, store="_id", auto_increment=True)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER AUTO_INCREMENT"])
 
         # INTEGER full
@@ -341,7 +340,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(int, store="_id", none=False, auto_increment=True, default=0)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`_id` INTEGER NOT NULL AUTO_INCREMENT DEFAULT 0"])
 
         # FLOAT
@@ -349,7 +348,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(float, store="spend")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`spend` DOUBLE"])
 
         # FLOAT default
@@ -357,7 +356,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(float, store="spend", default=0.1)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL DEFAULT 0.1"])
 
         # FLOAT function default
@@ -365,7 +364,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(float, store="spend", default=deffer)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL"])
 
         # FLOAT none
@@ -373,7 +372,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(float, store="spend", none=False)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL"])
 
         # VARCHAR
@@ -381,7 +380,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(255)"])
 
         # VARCHAR length
@@ -389,7 +388,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name", length=32)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(32)"])
 
         # VARCHAR default
@@ -397,7 +396,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name", default='ya')
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL DEFAULT 'ya'"])
 
         # VARCHAR function default
@@ -405,7 +404,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name", default=deffer)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL"])
 
         # VARCHAR none
@@ -413,7 +412,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name", none=False)
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL"])
 
         # VARCHAR full
@@ -421,7 +420,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name", length=32, none=False, default='ya')
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ["`name` VARCHAR(32) NOT NULL DEFAULT 'ya'"])
 
         # JSON (list)
@@ -429,7 +428,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(list, name='stuff')
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ['`stuff` JSON NOT NULL'])
 
         # JSON (dict)
@@ -437,7 +436,7 @@ class TestSource(unittest.TestCase):
         field = relations.Field(dict, name='things')
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ['`things` JSON NOT NULL'])
 
         # JSON (anything)
@@ -445,23 +444,36 @@ class TestSource(unittest.TestCase):
         field = relations.Field(ipaddress.IPv4Address, name='ip', attr="whatev")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, None)
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, ['`ip` JSON'])
 
         # EXTRACTED
 
-        field = relations.Field(str, name='grab', extract="things__a__b__0___1")
+        field = relations.Field(dict, name='grab', extract={
+            "a__b__0___1": bool,
+            "c__b__0___1": int,
+            "c__d__0___1": float,
+            "c__d__1___1": str,
+            "c__d__1___2": list
+        })
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, Meta.thy())
-        self.assertEqual(definitions, ["`grab` VARCHAR(255) AS (`things`->>'$.a.b[0].\"1\"')"])
+        self.source.field_define(field, definitions)
+        self.assertEqual(definitions, [
+            "`grab` JSON NOT NULL",
+            "`grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')",
+            "`grab__c__b__0___1` INTEGER AS (`grab`->>'$.c.b[0].\"1\"')",
+            "`grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')",
+            "`grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')",
+            "`grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
+        ])
 
         # INJECTED
 
         field = relations.Field(str, name='toss', inject="things__a__b__0___1")
         self.source.field_init(field)
         definitions = []
-        self.source.field_define(field, definitions, Meta.thy())
+        self.source.field_define(field, definitions)
         self.assertEqual(definitions, [])
 
     def test_model_define(self):
@@ -564,7 +576,7 @@ class TestSource(unittest.TestCase):
             "spend": 3.50,
             "stuff": '[1, {"relations.io": {"1": "sure"}}]',
             "things": '{"for": [{"1": "yep"}]}',
-            "pull": "yep"
+            "things__for__0___1": "yep"
         })
 
         cursor.close()
@@ -647,6 +659,15 @@ class TestSource(unittest.TestCase):
         self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`meta`->>%s=%s")
         self.assertEqual(values, ['$.a.b[0]."1"', 1])
+
+        field = relations.Field(dict, name='meta', extract="a__b__0___1")
+        self.source.field_init(field)
+        field.filter(1, 'a__b__0___1')
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, "`meta__a__b__0___1`=%s")
+        self.assertEqual(values, [1])
 
         # =
 
@@ -754,7 +775,7 @@ class TestSource(unittest.TestCase):
 
             id = int
             name = str
-            ip = ipaddress.IPv4Address, {"attr": {"compressed": "address", "__int__": "value"}, "init": "address", "label": "value"}
+            ip = ipaddress.IPv4Address, {"attr": {"compressed": "address", "__int__": "value"}, "init": "address", "label": ["address", "value"], "extract": "address"}
             subnet = ipaddress.IPv4Network, {"attr": subnet_attr, "init": "address", "label": "address"}
 
             LABEL = ["ip", "subnet__min_address"]
@@ -764,8 +785,8 @@ class TestSource(unittest.TestCase):
         query = copy.deepcopy(net.QUERY)
         values = []
         self.source.model_like(net, query, values)
-        self.assertEqual(query.wheres, '(`ip`->>%s LIKE %s OR `subnet`->>%s LIKE %s)')
-        self.assertEqual(values, ['$.value', '%p%', '$.min_address', '%p%'])
+        self.assertEqual(query.wheres, '(`ip__address` LIKE %s OR `ip`->>%s LIKE %s OR `subnet`->>%s LIKE %s)')
+        self.assertEqual(values, ['%p%', '$.value', '%p%', '$.min_address', '%p%'])
 
     def test_model_sort(self):
 
@@ -887,7 +908,6 @@ class TestSource(unittest.TestCase):
 
         model = Meta.many(stuff__1=2)
         self.assertEqual(model[0].name, "dive")
-        self.assertEqual(model[0].pull, "yep")
 
         model = Meta.many(things__a__b__0=1)
         self.assertEqual(model[0].name, "dive")
@@ -917,19 +937,19 @@ class TestSource(unittest.TestCase):
         Net().create()
 
         model = Net.many(like='1.2.3.')
-        self.assertEqual(model[0].ip_address, "1.2.3.4")
+        self.assertEqual(model[0].ip.compressed, "1.2.3.4")
 
         model = Net.many(ip__address__like='1.2.3.')
-        self.assertEqual(model[0].ip_address, "1.2.3.4")
+        self.assertEqual(model[0].ip.compressed, "1.2.3.4")
 
         model = Net.many(ip__value__gt=int(ipaddress.IPv4Address('1.2.3.0')))
-        self.assertEqual(model[0].ip_address, "1.2.3.4")
+        self.assertEqual(model[0].ip.compressed, "1.2.3.4")
 
         model = Net.many(subnet__address__like='1.2.3.')
-        self.assertEqual(model[0].ip_address, "1.2.3.4")
+        self.assertEqual(model[0].ip.compressed, "1.2.3.4")
 
         model = Net.many(subnet__min_value=int(ipaddress.IPv4Address('1.2.3.0')))
-        self.assertEqual(model[0].ip_address, "1.2.3.4")
+        self.assertEqual(model[0].ip.compressed, "1.2.3.4")
 
         model = Net.many(ip__address__notlike='1.2.3.')
         self.assertEqual(len(model), 0)
@@ -1058,19 +1078,6 @@ class TestSource(unittest.TestCase):
 
         plain = Plain.one()
         self.assertRaisesRegex(relations.ModelError, "plain: nothing to update from", plain.update)
-
-        dive = Meta("dive", things={"for": [{"1": "yep"}]}).create()
-        swim = Meta("swim", things={"for": [{"1": "nope"}]}).create()
-
-        Meta.many().set(things={"for": [{"1": "um"}]}).update()
-
-        self.assertEqual(Meta.one(dive.id).pull, "um")
-        self.assertEqual(Meta.one(swim.id).pull, "um")
-
-        Meta.one(swim.id).set(things={"for": [{"1": "nah"}]}).update()
-
-        self.assertEqual(Meta.one(dive.id).pull, "um")
-        self.assertEqual(Meta.one(swim.id).pull, "nah")
 
         ping = Net(ip="1.2.3.4", subnet="1.2.3.0/24").create()
         pong = Net(ip="5.6.7.8", subnet="5.6.7.0/24").create()
