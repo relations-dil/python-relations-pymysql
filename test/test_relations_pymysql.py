@@ -486,7 +486,7 @@ class TestSource(unittest.TestCase):
             id = int
             name = str
 
-            INDEX = "id"
+            INDEX = ["id", "name"]
 
         self.assertEqual(Simple.define(), "whatever")
 
@@ -496,7 +496,7 @@ class TestSource(unittest.TestCase):
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`),
-  INDEX `id` (`id`)
+  INDEX `id_name` (`id`,`name`)
 )""")
 
         cursor = self.source.connection.cursor()
