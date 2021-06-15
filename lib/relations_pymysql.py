@@ -238,7 +238,7 @@ class Source(relations.Source):
             definitions.append(f"UNIQUE `{unique.replace('-', '_')}` (`{fields}`)")
 
         for index in model._index:
-            fields = '","'.join(model._index[index])
+            fields = '`,`'.join(model._index[index])
             definitions.append(f"INDEX `{index.replace('-', '_')}` (`{fields}`)")
 
         sep = ',\n  '
