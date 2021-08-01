@@ -217,13 +217,13 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
             definition = [f"`{field['store']}__{store}`"]
 
-            if kind == bool:
+            if kind == 'bool':
                 definition.append("TINYINT")
-            elif kind == int:
+            elif kind == 'int':
                 definition.append("INTEGER")
-            elif kind == float:
+            elif kind == 'float':
                 definition.append("DOUBLE")
-            elif kind == str:
+            elif kind == 'str':
                 definition.append("VARCHAR(255)")
             else:
                 definition.append("JSON")
