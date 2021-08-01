@@ -1396,3 +1396,50 @@ DROP TABLE IF EXISTS `test_source`.`simple`;
 ALTER TABLE `test_source`.`simple`
   RENAME TO `test_source`.`simples`;
 """)
+
+    def test_execute(self):
+
+        self.source.execute("")
+
+        self.source.execute("""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
+  `id` INTEGER AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE `name` (`name`)
+);""")
+
+        cursor = self.source.connection.cursor()
+
+        cursor.execute("DESCRIBE `test_source`.`simple`")
+
+        id = cursor.fetchone()
+        self.assertEqual(id["Field"], "id")
+        self.assertEqual(id["Type"], "int(11)")
+
+        name = cursor.fetchone()
+        self.assertEqual(name["Field"], "name")
+        self.assertEqual(name["Type"], "varchar(255)")
+
+    def test_migrate(self):
+
+        migrations = relations.Migrations()
+
+        migrations.generate([Unit])
+        migrations.generate([Unit, Test])
+        migrations.convert(self.source.name)
+
+        self.assertTrue(self.source.migrate(f"ddl/{self.source.name}/{self.source.KIND}"))
+
+        self.assertEqual(Unit.many().count(), 0)
+        self.assertEqual(Test.many().count(), 0)
+
+        self.assertFalse(self.source.migrate(f"ddl/{self.source.name}/{self.source.KIND}"))
+
+        migrations.generate([Unit, Test, Case])
+        migrations.convert(self.source.name)
+
+        self.assertTrue(self.source.migrate(f"ddl/{self.source.name}/{self.source.KIND}"))
+
+        self.assertEqual(Case.many().count(), 0)
+
+        self.assertFalse(self.source.migrate(f"ddl/{self.source.name}/{self.source.KIND}"))

@@ -3,6 +3,8 @@ Module for intersting with PyMySQL
 """
 
 # pylint: disable=arguments-differ
+
+import glob
 import copy
 import json
 
@@ -12,7 +14,7 @@ import pymysql.cursors
 import relations
 import relations.query
 
-class Source(relations.Source):
+class Source(relations.Source): # pylint: disable=too-many-public-methods
     """
     PyMySQL Source
     """
@@ -232,8 +234,11 @@ class Source(relations.Source):
 
     @staticmethod
     def index_define(name, fields, unique=False):
+        """
+        Defines an index
+        """
 
-            return f"{'UNIQUE' if unique else 'INDEX'} `{name.replace('-', '_')}` (`{'`,`'.join(fields)}`)"
+        return f"{'UNIQUE' if unique else 'INDEX'} `{name.replace('-', '_')}` (`{'`,`'.join(fields)}`)"
 
     def model_define(self, model):
         """
@@ -291,17 +296,17 @@ class Source(relations.Source):
         if definition.get('inject'):
             return
 
-        definitions = []
+        fields = []
 
-        self.field_define({**definition, **migration}, definitions)
+        self.field_define({**definition, **migration}, fields)
 
         names = [definition['store']]
 
         for store in sorted(definition.get('extract', {}).keys()):
             names.append(f"{definition['store']}__{store}")
 
-        for index, definition in enumerate(definitions):
-            migrations.append(f"CHANGE `{names[index]}` {definition}")
+        for index, field in enumerate(fields):
+            migrations.append(f"CHANGE `{names[index]}` {field}")
 
     def model_add(self, definition):
         """
@@ -793,3 +798,78 @@ class Source(relations.Source):
             with open(f"{source_path}/{file_name}.sql", "w") as source_file:
                 source_file.write(";\n\n".join(migrations))
                 source_file.write(";\n")
+
+    def execute(self, commands):
+        """
+        Execute one or more commands
+        """
+
+        if not isinstance(commands, list):
+            commands = [commands]
+
+        cursor = self.connection.cursor()
+
+        for command in commands:
+            if command.strip():
+                cursor.execute(command)
+
+        self.connection.commit()
+
+        cursor.close()
+
+    def migrate(self, source_path):
+        """
+        Migrate all the existing files to where we are
+        """
+
+        migrated = False
+
+        cursor = self.connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) AS `migrations`
+            FROM information_schema.tables
+            WHERE table_schema = %s AND table_name = %s
+            LIMIT 1
+        """, (self.database, "_relations_migrations"))
+
+        migrations = cursor.fetchone()['migrations']
+
+        migration_paths = sorted(glob.glob(f"{source_path}/migration-*.sql"))
+
+        if not migrations:
+
+            cursor.execute(f"""
+                CREATE TABLE `{self.database}`.`_relations_migrations` (
+                    `migration` VARCHAR(255) NOT NULL,
+                    PRIMARY KEY (`migration`)
+                );
+            """)
+
+            with open(f"{source_path}/definition.sql", 'r') as definition_file:
+                self.execute(definition_file.read().split(";\n"))
+                migrated = True
+
+        else:
+
+            cursor.execute(f"SELECT `migration` FROM `{self.database}`.`_relations_migrations` ORDER BY `migration`")
+
+            migrations = [row['migration'] for row in cursor.fetchall()]
+
+            for migration_path in migration_paths:
+                if migration_path.rsplit("/migration-", 1)[-1].split('.')[0] not in migrations:
+                    with open(migration_path, 'r') as migration_file:
+                        self.execute(migration_file.read().split(";\n"))
+                    migrated = True
+
+        for migration_path in migration_paths:
+            migration = migration_path.rsplit("/migration-", 1)[-1].split('.')[0]
+            if not migrations or migration not in migrations:
+                cursor.execute(
+                    f"INSERT INTO `{self.database}`.`_relations_migrations` VALUES (%s)",
+                    (migration, )
+                )
+
+        self.connection.commit()
+
+        return migrated
