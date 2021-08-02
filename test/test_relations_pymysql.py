@@ -256,6 +256,7 @@ class TestSource(unittest.TestCase):
 
         self.source.model_init(model)
 
+        self.assertIn("QUERY", model.UNDEFINE)
         self.assertIsNone(model.DATABASE)
         self.assertEqual(model.TABLE, "check")
         self.assertEqual(model.QUERY.get(), "SELECT * FROM `test_source`.`check`")
@@ -263,202 +264,152 @@ class TestSource(unittest.TestCase):
         self.assertTrue(model._fields._names["id"].auto_increment)
         self.assertTrue(model._fields._names["id"].auto)
 
-    def test_field_define(self):
-
-        def deffer():
-            pass
+    def test_column_define(self):
 
         # Specific
 
         field = relations.Field(int, definition="id")
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["id"])
+        self.assertEqual(self.source.column_define(field.define()), "id")
 
         # TINYINT
 
         field = relations.Field(bool, store="_flag")
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_flag` TINYINT"])
+        self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT")
 
         # TINYINT default
 
         field = relations.Field(bool, store="_flag", default=False)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL DEFAULT 0"])
-
-        # TINYINT function default
-
-        field = relations.Field(bool, store="_flag", default=deffer)
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT NOT NULL DEFAULT 0")
 
         # TINYINT none
 
         field = relations.Field(bool, store="_flag", none=False)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_flag` TINYINT NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT NOT NULL")
 
         # INTEGER
 
         field = relations.Field(int, store="_id")
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER"])
+        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER")
 
         # INTEGER default
 
         field = relations.Field(int, store="_id", default=0)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER NOT NULL DEFAULT 0"])
-
-        # INTEGER function default
-
-        field = relations.Field(int, store="_id", default=deffer)
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER NOT NULL DEFAULT 0")
 
         # INTEGER none
 
         field = relations.Field(int, store="_id", none=False)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER NOT NULL")
 
         # INTEGER auto_increment
 
         field = relations.Field(int, store="_id", auto_increment=True)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER AUTO_INCREMENT"])
+        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER AUTO_INCREMENT")
 
         # INTEGER full
 
         field = relations.Field(int, store="_id", none=False, auto_increment=True, default=0)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`_id` INTEGER NOT NULL AUTO_INCREMENT DEFAULT 0"])
+        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER NOT NULL AUTO_INCREMENT DEFAULT 0")
 
         # FLOAT
 
         field = relations.Field(float, store="spend")
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`spend` DOUBLE"])
+        self.assertEqual(self.source.column_define(field.define()), "`spend` DOUBLE")
 
         # FLOAT default
 
         field = relations.Field(float, store="spend", default=0.1)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL DEFAULT 0.1"])
-
-        # FLOAT function default
-
-        field = relations.Field(float, store="spend", default=deffer)
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`spend` DOUBLE NOT NULL DEFAULT 0.1")
 
         # FLOAT none
 
         field = relations.Field(float, store="spend", none=False)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`spend` DOUBLE NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`spend` DOUBLE NOT NULL")
 
         # VARCHAR
 
         field = relations.Field(str, name="name")
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(255)"])
+        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(255)")
 
         # VARCHAR length
 
         field = relations.Field(str, name="name", length=32)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(32)"])
+        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(32)")
 
         # VARCHAR default
 
         field = relations.Field(str, name="name", default='ya')
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL DEFAULT 'ya'"])
-
-        # VARCHAR function default
-
-        field = relations.Field(str, name="name", default=deffer)
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(255) NOT NULL DEFAULT 'ya'")
 
         # VARCHAR none
 
         field = relations.Field(str, name="name", none=False)
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(255) NOT NULL"])
+        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(255) NOT NULL")
 
         # VARCHAR full
 
         field = relations.Field(str, name="name", length=32, none=False, default='ya')
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ["`name` VARCHAR(32) NOT NULL DEFAULT 'ya'"])
+        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(32) NOT NULL DEFAULT 'ya'")
 
         # JSON (list)
 
         field = relations.Field(list, name='stuff')
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ['`stuff` JSON NOT NULL'])
+        self.assertEqual(self.source.column_define(field.define()), '`stuff` JSON NOT NULL')
 
         # JSON (dict)
 
         field = relations.Field(dict, name='things')
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ['`things` JSON NOT NULL'])
+        self.assertEqual(self.source.column_define(field.define()), '`things` JSON NOT NULL')
 
         # JSON (anything)
 
         field = relations.Field(ipaddress.IPv4Address, name='ip', attr="whatev")
         self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, ['`ip` JSON'])
+        self.assertEqual(self.source.column_define(field.define()), '`ip` JSON')
+
+    def test_extract_define(self):
+
+        self.assertEqual(
+            self.source.extract_define('grab', 'a__b__0___1', 'bool'),
+            "`grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')"
+        )
+        self.assertEqual(
+            self.source.extract_define('grab', 'c__b__0___1', 'int'),
+            "`grab__c__b__0___1` INTEGER AS (`grab`->>'$.c.b[0].\"1\"')"
+        )
+        self.assertEqual(
+            self.source.extract_define('grab', 'c__d__0___1', 'float'),
+            "`grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')"
+        )
+        self.assertEqual(
+            self.source.extract_define('grab', 'c__d__1___1', 'str'),
+            "`grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')"
+        )
+        self.assertEqual(
+            self.source.extract_define('grab', 'c__d__1___2', 'dict'),
+            "`grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
+        )
+
+    def test_field_define(self):
 
         # EXTRACTED
 
@@ -479,6 +430,22 @@ class TestSource(unittest.TestCase):
             "`grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')",
             "`grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')",
             "`grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
+        ])
+
+        # (not) EXTRACTED
+
+        field = relations.Field(dict, name='grab', extract={
+            "a__b__0___1": bool,
+            "c__b__0___1": int,
+            "c__d__0___1": float,
+            "c__d__1___1": str,
+            "c__d__1___2": list
+        })
+        self.source.field_init(field)
+        definitions = []
+        self.source.field_define(field.define(), definitions, extract=False)
+        self.assertEqual(definitions, [
+            "`grab` JSON NOT NULL"
         ])
 
         # INJECTED
@@ -596,16 +563,26 @@ class TestSource(unittest.TestCase):
         })
         self.source.field_init(field)
         definition = field.define()
-        migration = {**definition, "store": "bag"}
+        migration = {
+            "store": "bag",
+            "extract": {
+                "a__b__0___1": 'bool',
+                "c__b__0___1": 'int',
+                "c__d__0___1": 'float',
+                "c__d__2___1": 'str',
+                "c__d__1___2": 'str'
+            }
+        }
         migrations = []
         self.source.field_change(definition, migration, migrations)
         self.assertEqual(migrations, [
             "CHANGE `grab` `bag` JSON NOT NULL",
+            "DROP `grab__c__d__1___1`",
             "CHANGE `grab__a__b__0___1` `bag__a__b__0___1` TINYINT AS (`bag`->>'$.a.b[0].\"1\"')",
             "CHANGE `grab__c__b__0___1` `bag__c__b__0___1` INTEGER AS (`bag`->>'$.c.b[0].\"1\"')",
             "CHANGE `grab__c__d__0___1` `bag__c__d__0___1` DOUBLE AS (`bag`->>'$.c.d[0].\"1\"')",
-            "CHANGE `grab__c__d__1___1` `bag__c__d__1___1` VARCHAR(255) AS (`bag`->>'$.c.d[1].\"1\"')",
-            "CHANGE `grab__c__d__1___2` `bag__c__d__1___2` JSON AS (`bag`->>'$.c.d[1].\"2\"')"
+            "CHANGE `grab__c__d__1___2` `bag__c__d__1___2` VARCHAR(255) AS (`bag`->>'$.c.d[1].\"2\"')",
+            "ADD `bag__c__d__2___1` VARCHAR(255) AS (`bag`->>'$.c.d[2].\"1\"')"
         ])
 
         # INJECTED

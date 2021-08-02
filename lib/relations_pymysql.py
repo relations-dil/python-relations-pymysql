@@ -150,17 +150,13 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             model._fields._names[model._id].auto_increment = True
             model._fields._names[model._id].auto = True
 
-    def field_define(self, field, definitions): # pylint: disable=too-many-branches
+    def column_define(self, field):
         """
-        Add what this field is the definition
+        Defines just the column for field
         """
-
-        if field.get('inject'):
-            return
 
         if field.get('definition') is not None:
-            definitions.append(field['definition'])
-            return
+            return field['definition']
 
         definition = [f"`{field['store']}`"]
 
@@ -209,28 +205,43 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if default:
             definition.append(default)
 
-        definitions.append(" ".join(definition))
+        return " ".join(definition)
 
-        for store in sorted(field.get('extract', {}).keys()):
+    def extract_define(self, store, path, kind):
+        """
+        Createa and extract store
+        """
 
-            kind = field['extract'][store]
+        definition = [f"`{store}__{path}`"]
 
-            definition = [f"`{field['store']}__{store}`"]
+        if kind == 'bool':
+            definition.append("TINYINT")
+        elif kind == 'int':
+            definition.append("INTEGER")
+        elif kind == 'float':
+            definition.append("DOUBLE")
+        elif kind == 'str':
+            definition.append("VARCHAR(255)")
+        else:
+            definition.append("JSON")
 
-            if kind == 'bool':
-                definition.append("TINYINT")
-            elif kind == 'int':
-                definition.append("INTEGER")
-            elif kind == 'float':
-                definition.append("DOUBLE")
-            elif kind == 'str':
-                definition.append("VARCHAR(255)")
-            else:
-                definition.append("JSON")
+        definition.append(f"AS (`{store}`->>'{self.walk(path)}')")
 
-            definition.append(f"AS (`{field['store']}`->>'{self.walk(store)}')")
+        return " ".join(definition)
 
-            definitions.append(" ".join(definition))
+    def field_define(self, field, definitions, extract=True):
+        """
+        Add what this field is the definition
+        """
+
+        if field.get('inject'):
+            return
+
+        definitions.append(self.column_define(field))
+
+        if extract:
+            for path in sorted(field.get('extract', {}).keys()):
+                definitions.append(self.extract_define(field['store'], path, field['extract'][path]))
 
     @staticmethod
     def index_define(name, fields, unique=False):
@@ -269,11 +280,13 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         add the field
         """
 
-        definitions = []
+        if migration.get('inject'):
+            return
 
-        self.field_define(migration, definitions)
+        migrations.append(f"ADD {self.column_define(migration)}")
 
-        migrations.extend([f"ADD {definition}" for definition in definitions])
+        for path in sorted(migration.get('extract', {}).keys()):
+            migrations.append(f"ADD {self.extract_define(migration['store'], path, migration['extract'][path])}")
 
     def field_remove(self, definition, migrations):
         """
@@ -285,8 +298,8 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         migrations.append(f"DROP `{definition['store']}`")
 
-        for store in sorted(definition.get('extract', {}).keys()):
-            migrations.append(f"DROP `{definition['store']}__{store}`")
+        for path in sorted(definition.get('extract', {}).keys()):
+            migrations.append(f"DROP `{definition['store']}__{path}`")
 
     def field_change(self, definition, migration, migrations):
         """
@@ -296,17 +309,32 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if definition.get('inject'):
             return
 
-        fields = []
+        # This is a little heavy handed but simpler, any changes will be propagated
 
-        self.field_define({**definition, **migration}, fields)
+        migrations.append(f"CHANGE `{definition['store']}` {self.column_define({**definition, **migration})}")
 
-        names = [definition['store']]
+        store = migration.get('store', definition['store'])
+        extract = migration.get('extract', definition.get('extract', {}))
 
-        for store in sorted(definition.get('extract', {}).keys()):
-            names.append(f"{definition['store']}__{store}")
+        # Remove all the ones that were there and now aren't
 
-        for index, field in enumerate(fields):
-            migrations.append(f"CHANGE `{names[index]}` {field}")
+        for path in sorted(definition.get('extract', {}).keys()):
+            if path not in extract:
+                migrations.append(f"DROP `{definition['store']}__{path}`")
+
+        # Add the ones that are new
+
+        for path in sorted(extract.keys()):
+
+            # Add the ones that are new
+
+            if path not in definition.get("extract"):
+                migrations.append(f"ADD {self.extract_define(store, path, migration['extract'][path])}")
+
+            # if the field name or extract kind has changed, change
+
+            elif definition['store'] != store or definition["extract"][path] != extract[path]:
+                migrations.append(f"CHANGE `{definition['store']}__{path}` {self.extract_define(store, path, extract[path])}")
 
     def model_add(self, definition):
         """
