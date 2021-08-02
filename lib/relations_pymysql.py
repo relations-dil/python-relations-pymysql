@@ -322,8 +322,6 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             if path not in extract:
                 migrations.append(f"DROP `{definition['store']}__{path}`")
 
-        # Add the ones that are new
-
         for path in sorted(extract.keys()):
 
             # Add the ones that are new
