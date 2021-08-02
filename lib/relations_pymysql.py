@@ -150,7 +150,8 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             model._fields._names[model._id].auto_increment = True
             model._fields._names[model._id].auto = True
 
-    def column_define(self, field):
+    @staticmethod
+    def column_define(field): #pylint: disable=too-many-branches
         """
         Defines just the column for field
         """
