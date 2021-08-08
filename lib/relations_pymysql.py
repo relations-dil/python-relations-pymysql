@@ -29,13 +29,13 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         'lte': '<='
     }
 
-    database = None   # Database to use
+    schema = None   # Database to use
     connection = None # Connection
     created = False   # If we created the connection
 
-    def __init__(self, name, database, connection=None, **kwargs):
+    def __init__(self, name, schema, connection=None, **kwargs):
 
-        self.database = database
+        self.schema = schema
 
         if connection is not None:
             self.connection = connection
@@ -43,7 +43,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             self.created = True
             self.connection = pymysql.connect(
                 cursorclass=pymysql.cursors.DictCursor,
-                **{name: arg for name, arg in kwargs.items() if name not in ["name", "database", "connection"]}
+                **{name: arg for name, arg in kwargs.items() if name not in ["name", "schema", "connection"]}
             )
 
     def __del__(self):
@@ -57,18 +57,18 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         """
 
         if isinstance(model, dict):
-            database = model.get("database")
+            schema = model.get("schema")
             table = model['table']
         else:
-            database = model.DATABASE
+            schema = model.SCHEMA
             table = model.TABLE
 
         name = []
 
-        if database is not None:
-            name.append(f"`{database}`")
-        elif self.database is not None:
-            name.append(f"`{self.database}`")
+        if schema is not None:
+            name.append(f"`{schema}`")
+        elif self.schema is not None:
+            name.append(f"`{self.schema}`")
 
         name.append(f"`{table}`")
 
@@ -133,7 +133,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         self.record_init(model._fields)
 
-        self.ensure_attribute(model, "DATABASE")
+        self.ensure_attribute(model, "SCHEMA")
         self.ensure_attribute(model, "TABLE")
         self.ensure_attribute(model, "QUERY")
         self.ensure_attribute(model, "DEFINITION")
@@ -250,7 +250,11 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Defines an index
         """
 
-        return f"{'UNIQUE' if unique else 'INDEX'} `{name.replace('-', '_')}` (`{'`,`'.join(fields)}`)"
+        index = 'UNIQUE' if unique else 'INDEX'
+        name = name.replace('-', '_')
+        fields = '`,`'.join(fields)
+
+        return f"{index} `{name}` (`{fields}`)"
 
     def model_define(self, model):
         """
@@ -358,7 +362,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         definition_table = self.table(definition)
         migration_table = self.table({
-            "database": migration.get("database", definition.get("database")),
+            "schema": migration.get("schema", definition.get("schema")),
             "table": migration.get("table", definition["table"])
         })
 
@@ -857,17 +861,18 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             SELECT COUNT(*) AS `migrations`
             FROM information_schema.tables
             WHERE table_schema = %s AND table_name = %s
-            LIMIT 1
-        """, (self.database, "_relations_migrations"))
+        """, (self.schema, "_relations_migrations"))
 
         migrations = cursor.fetchone()['migrations']
 
         migration_paths = sorted(glob.glob(f"{source_path}/migration-*.sql"))
 
+        table = self.table({"table": "_relations_migrations"})
+
         if not migrations:
 
             cursor.execute(f"""
-                CREATE TABLE `{self.database}`.`_relations_migrations` (
+                CREATE TABLE {table} (
                     `migration` VARCHAR(255) NOT NULL,
                     PRIMARY KEY (`migration`)
                 );
@@ -879,7 +884,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         else:
 
-            cursor.execute(f"SELECT `migration` FROM `{self.database}`.`_relations_migrations` ORDER BY `migration`")
+            cursor.execute(f"SELECT `migration` FROM {table} ORDER BY `migration`")
 
             migrations = [row['migration'] for row in cursor.fetchall()]
 
@@ -892,10 +897,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         for migration_path in migration_paths:
             migration = migration_path.rsplit("/migration-", 1)[-1].split('.')[0]
             if not migrations or migration not in migrations:
-                cursor.execute(
-                    f"INSERT INTO `{self.database}`.`_relations_migrations` VALUES (%s)",
-                    (migration, )
-                )
+                cursor.execute(f"INSERT INTO {table} VALUES (%s)", (migration, ))
 
         self.connection.commit()
 

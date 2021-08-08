@@ -104,14 +104,14 @@ class TestSource(unittest.TestCase):
         source = relations_pymysql.Source("unit", "init", connection="corkneckshurn")
         self.assertFalse(source.created)
         self.assertEqual(source.name, "unit")
-        self.assertEqual(source.database, "init")
+        self.assertEqual(source.schema, "init")
         self.assertEqual(source.connection, "corkneckshurn")
         self.assertEqual(relations.SOURCES["unit"], source)
 
         source = relations_pymysql.Source("test", "init", host="db.com", extra="stuff")
         self.assertTrue(source.created)
         self.assertEqual(source.name, "test")
-        self.assertEqual(source.database, "init")
+        self.assertEqual(source.schema, "init")
         self.assertEqual(source.connection, pymysql.connect.return_value)
         self.assertEqual(relations.SOURCES["test"], source)
         pymysql.connect.assert_called_once_with(cursorclass=pymysql.cursors.DictCursor, host="db.com", extra="stuff")
@@ -136,16 +136,16 @@ class TestSource(unittest.TestCase):
         }
         self.assertEqual(self.source.table(model), "`test_source`.`people`")
 
-        model["database"] = "stuff"
+        model["schema"] = "stuff"
         self.assertEqual(self.source.table(model), "`stuff`.`people`")
 
         model = unittest.mock.MagicMock()
-        model.DATABASE = None
+        model.SCHEMA = None
 
         model.TABLE = "people"
         self.assertEqual(self.source.table(model), "`test_source`.`people`")
 
-        model.DATABASE = "stuff"
+        model.SCHEMA = "stuff"
         self.assertEqual(self.source.table(model), "`stuff`.`people`")
 
     def test_encode(self):
@@ -257,7 +257,7 @@ class TestSource(unittest.TestCase):
         self.source.model_init(model)
 
         self.assertIn("QUERY", model.UNDEFINE)
-        self.assertIsNone(model.DATABASE)
+        self.assertIsNone(model.SCHEMA)
         self.assertEqual(model.TABLE, "check")
         self.assertEqual(model.QUERY.get(), "SELECT * FROM `test_source`.`check`")
         self.assertIsNone(model.DEFINITION)
