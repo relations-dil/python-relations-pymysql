@@ -290,35 +290,35 @@ class TestSource(unittest.TestCase):
         self.source.field_init(field)
         self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT NOT NULL")
 
-        # INTEGER
+        # BIGINT
 
         field = relations.Field(int, store="_id")
         self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER")
+        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT")
 
-        # INTEGER default
+        # BIGINT default
 
         field = relations.Field(int, store="_id", default=0)
         self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER NOT NULL DEFAULT 0")
+        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT NOT NULL DEFAULT 0")
 
-        # INTEGER none
+        # BIGINT none
 
         field = relations.Field(int, store="_id", none=False)
         self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER NOT NULL")
+        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT NOT NULL")
 
-        # INTEGER auto_increment
+        # BIGINT auto_increment
 
         field = relations.Field(int, store="_id", auto_increment=True)
         self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER AUTO_INCREMENT")
+        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT AUTO_INCREMENT")
 
-        # INTEGER full
+        # BIGINT full
 
         field = relations.Field(int, store="_id", none=False, auto_increment=True, default=0)
         self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` INTEGER NOT NULL AUTO_INCREMENT DEFAULT 0")
+        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT NOT NULL AUTO_INCREMENT DEFAULT 0")
 
         # FLOAT
 
@@ -394,7 +394,7 @@ class TestSource(unittest.TestCase):
         )
         self.assertEqual(
             self.source.extract_define('grab', 'c__b__0___1', 'int'),
-            "`grab__c__b__0___1` INTEGER AS (`grab`->>'$.c.b[0].\"1\"')"
+            "`grab__c__b__0___1` BIGINT AS (`grab`->>'$.c.b[0].\"1\"')"
         )
         self.assertEqual(
             self.source.extract_define('grab', 'c__d__0___1', 'float'),
@@ -426,7 +426,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(definitions, [
             "`grab` JSON NOT NULL",
             "`grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')",
-            "`grab__c__b__0___1` INTEGER AS (`grab`->>'$.c.b[0].\"1\"')",
+            "`grab__c__b__0___1` BIGINT AS (`grab`->>'$.c.b[0].\"1\"')",
             "`grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')",
             "`grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')",
             "`grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
@@ -477,7 +477,7 @@ class TestSource(unittest.TestCase):
 
         Simple.DEFINITION = None
         self.assertEqual(self.source.model_define(Simple.thy().define()), ["""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` INTEGER AUTO_INCREMENT,
+  `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`),
@@ -505,7 +505,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(migrations, [
             "ADD `grab` JSON NOT NULL",
             "ADD `grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')",
-            "ADD `grab__c__b__0___1` INTEGER AS (`grab`->>'$.c.b[0].\"1\"')",
+            "ADD `grab__c__b__0___1` BIGINT AS (`grab`->>'$.c.b[0].\"1\"')",
             "ADD `grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')",
             "ADD `grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')",
             "ADD `grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
@@ -579,7 +579,7 @@ class TestSource(unittest.TestCase):
             "CHANGE `grab` `bag` JSON NOT NULL",
             "DROP `grab__c__d__1___1`",
             "CHANGE `grab__a__b__0___1` `bag__a__b__0___1` TINYINT AS (`bag`->>'$.a.b[0].\"1\"')",
-            "CHANGE `grab__c__b__0___1` `bag__c__b__0___1` INTEGER AS (`bag`->>'$.c.b[0].\"1\"')",
+            "CHANGE `grab__c__b__0___1` `bag__c__b__0___1` BIGINT AS (`bag`->>'$.c.b[0].\"1\"')",
             "CHANGE `grab__c__d__0___1` `bag__c__d__0___1` DOUBLE AS (`bag`->>'$.c.d[0].\"1\"')",
             "CHANGE `grab__c__d__1___2` `bag__c__d__1___2` VARCHAR(255) AS (`bag`->>'$.c.d[1].\"2\"')",
             "ADD `bag__c__d__2___1` VARCHAR(255) AS (`bag`->>'$.c.d[2].\"1\"')"
@@ -598,7 +598,7 @@ class TestSource(unittest.TestCase):
     def test_model_add(self):
 
         self.assertEqual(self.source.model_add(Simple.thy().define()), ["""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` INTEGER AUTO_INCREMENT,
+  `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`)
@@ -678,7 +678,7 @@ class TestSource(unittest.TestCase):
 
         self.assertEqual(self.source.model_change(Simple.thy().define(), migration)[0], """ALTER TABLE `test_source`.`simple`
   RENAME TO `test_source`.`simples`,
-  ADD `fee` INTEGER,
+  ADD `fee` BIGINT,
   DROP `fie`,
   CHANGE `foe` `foe` DOUBLE,
   ADD UNIQUE `fee` (`fee`),
@@ -1326,13 +1326,13 @@ class TestSource(unittest.TestCase):
 
         with open("ddl/sourced/general.sql", 'r') as ddl_file:
             self.assertEqual(ddl_file.read(), """CREATE TABLE IF NOT EXISTS `test_source`.`plain` (
-  `simple_id` INTEGER,
+  `simple_id` BIGINT,
   `name` VARCHAR(255) NOT NULL,
   UNIQUE `simple_id_name` (`simple_id`,`name`)
 );
 
 CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` INTEGER AUTO_INCREMENT,
+  `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`)
@@ -1362,7 +1362,7 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
 
         with open("ddl/sourced/general.sql", 'r') as ddl_file:
             self.assertEqual(ddl_file.read(), """CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` INTEGER AUTO_INCREMENT,
+  `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`)
@@ -1379,7 +1379,7 @@ ALTER TABLE `test_source`.`simple`
         self.source.execute("")
 
         self.source.execute("""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` INTEGER AUTO_INCREMENT,
+  `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`)
@@ -1391,7 +1391,7 @@ ALTER TABLE `test_source`.`simple`
 
         id = cursor.fetchone()
         self.assertEqual(id["Field"], "id")
-        self.assertEqual(id["Type"], "int(11)")
+        self.assertEqual(id["Type"], "bigint(20)")
 
         name = cursor.fetchone()
         self.assertEqual(name["Field"], "name")
