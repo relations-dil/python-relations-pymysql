@@ -172,7 +172,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         elif field['kind'] == 'int':
 
-            definition.append("INTEGER")
+            definition.append("BIGINT")
 
             if field.get('default') is not None:
                 default = f"DEFAULT {field['default']}"
@@ -218,7 +218,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if kind == 'bool':
             definition.append("TINYINT")
         elif kind == 'int':
-            definition.append("INTEGER")
+            definition.append("BIGINT")
         elif kind == 'float':
             definition.append("DOUBLE")
         elif kind == 'str':
