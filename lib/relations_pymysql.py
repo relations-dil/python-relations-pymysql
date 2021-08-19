@@ -8,6 +8,8 @@ import glob
 import copy
 import json
 
+import threading
+
 import pymysql
 import pymysql.cursors
 
@@ -30,26 +32,45 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
     }
 
     schema = None   # Database to use
-    connection = None # Connection
+    connections = None # Connections
     created = False   # If we created the connection
+    kwargs = None
 
     def __init__(self, name, schema, connection=None, **kwargs):
 
         self.schema = schema
+        self.kwargs = {name: arg for name, arg in kwargs.items() if name not in ["name", "schema", "connection"]}
+        self.connections = {}
 
         if connection is not None:
-            self.connection = connection
+            self.connections[threading.get_ident()] = connection
         else:
             self.created = True
-            self.connection = pymysql.connect(
-                cursorclass=pymysql.cursors.DictCursor,
-                **{name: arg for name, arg in kwargs.items() if name not in ["name", "schema", "connection"]}
+            self.connections[threading.get_ident()] = pymysql.connect(
+                cursorclass=pymysql.cursors.DictCursor, **self.kwargs
             )
+
+    def __getattr__(self, name):
+
+        if name == "connection":
+
+            thread = threading.get_ident()
+
+            if thread not in self.connections:
+                self.connections[thread] = pymysql.connect(
+                    cursorclass=pymysql.cursors.DictCursor, **self.kwargs
+                )
+
+            return self.connections[thread]
+
+        raise AttributeError(f"'{self}' object has no attribute '{name}'")
 
     def __del__(self):
 
-        if self.created and self.connection:
-            self.connection.close()
+        if self.created and self.connections:
+            for connection in self.connections.values():
+                if connection:
+                    connection.close()
 
     def table(self, model):
         """
