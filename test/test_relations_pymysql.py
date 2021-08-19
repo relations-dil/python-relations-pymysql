@@ -6,6 +6,8 @@ import shutil
 import pathlib
 import copy
 import json
+import threading
+
 import pymysql.cursors
 
 import ipaddress
@@ -119,10 +121,26 @@ class TestSource(unittest.TestCase):
 
     @unittest.mock.patch("relations.SOURCES", {})
     @unittest.mock.patch("pymysql.connect", unittest.mock.MagicMock())
+    def test___getattr__(self):
+
+        source = relations_pymysql.Source("test", "init", host="db.com", extra="stuff")
+        self.assertTrue(source.connection)
+
+        del source.connections[threading.get_ident()]
+        self.assertTrue(source.connection)
+
+        def disconnect():
+
+            source.disconnection
+
+        self.assertRaisesRegex(Exception, "object has no attribute 'disconnection'", disconnect)
+
+    @unittest.mock.patch("relations.SOURCES", {})
+    @unittest.mock.patch("pymysql.connect", unittest.mock.MagicMock())
     def test___del__(self):
 
         source = relations_pymysql.Source("test", "init", host="db.com", extra="stuff")
-        source.connection = None
+        source.connections[threading.get_ident()] = None
         del relations.SOURCES["test"]
         pymysql.connect.return_value.close.assert_not_called()
 
