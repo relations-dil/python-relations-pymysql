@@ -466,7 +466,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return model
 
-    def field_retrieve(self, field, query, values): # pylint: disable=too-many-branches
+    def field_retrieve(self, field, query, values): # pylint: disable=too-many-branches,too-many-statements
         """
         Adds where caluse to query
         """
