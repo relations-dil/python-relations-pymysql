@@ -997,7 +997,7 @@ class TestSource(unittest.TestCase):
         query = relations.query.Query()
         values = []
         self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "(JSON_CONTAINS(`meta`, %s) AND JSON_LENGTH(`meta`)=%s)")
+        self.assertEqual(query.wheres, "JSON_CONTAINS(`meta`, %s) AND JSON_LENGTH(`meta`)=%s")
         self.assertEqual(values, ['["1", "2"]', 2])
 
         field = relations.Field(dict, store="meta")
@@ -1006,7 +1006,7 @@ class TestSource(unittest.TestCase):
         query = relations.query.Query()
         values = []
         self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "(JSON_CONTAINS(`meta`->>%s, %s) AND JSON_LENGTH(`meta`->>%s)=%s)")
+        self.assertEqual(query.wheres, "JSON_CONTAINS(`meta`->>%s, %s) AND JSON_LENGTH(`meta`->>%s)=%s")
         self.assertEqual(values, ['$.a', '["1", "2"]', '$.a', 2])
 
     def test_model_like(self):

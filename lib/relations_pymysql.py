@@ -525,8 +525,9 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
                     values.append(json.dumps(each))
                 query.add(wheres=f"({' OR '.join(contains)})")
             elif operator == "all":
-                query.add(wheres=f"(JSON_CONTAINS({store}, %s) AND JSON_LENGTH({store})=%s)")
+                query.add(wheres=f"JSON_CONTAINS({store}, %s)")
                 values.append(json.dumps(value))
+                query.add(wheres=f"JSON_LENGTH({store})=%s")
                 if walked is not None:
                     values.append(walked)
                 values.append(len(value))
