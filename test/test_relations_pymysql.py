@@ -1425,11 +1425,12 @@ class TestSource(unittest.TestCase):
         self.assertEqual(unit.test[0].name, "moar")
 
         Meta("yep", True, 1.1, {"tom"}, [1, None], {"a": 1}).create()
-        Meta.one(name="yep").set(flag=False, stuff=[], things={}).update()
+        Meta.one(name="yep").set(flag=False, people=set(), stuff=[], things={}).update()
 
         model = Meta.one(name="yep")
         self.assertEqual(model.flag, False)
         self.assertEqual(model.spend, 1.1)
+        self.assertEqual(model.people, set())
         self.assertEqual(model.stuff, [])
         self.assertEqual(model.things, {})
 
