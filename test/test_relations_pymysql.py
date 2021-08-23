@@ -34,6 +34,7 @@ class Meta(SourceModel):
     name = str
     flag = bool
     spend = float
+    people = set
     stuff = list
     things = dict, {"extract": "for__0___1"}
     push = str, {"inject": "stuff__-1__relations.io___1"}
@@ -386,6 +387,12 @@ class TestSource(unittest.TestCase):
         field = relations.Field(str, name="name", length=32, none=False, default='ya')
         self.source.field_init(field)
         self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(32) NOT NULL DEFAULT 'ya'")
+
+        # JSON (set)
+
+        field = relations.Field(set, name='people')
+        self.source.field_init(field)
+        self.assertEqual(self.source.column_define(field.define()), '`people` JSON NOT NULL')
 
         # JSON (list)
 
@@ -774,13 +781,14 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
-        Meta("yep", True, 3.50, [1, None], {"for": [{"1": "yep"}]}, "sure").create()
+        Meta("yep", True, 3.50, {"tom", "mary"}, [1, None], {"for": [{"1": "yep"}]}, "sure").create()
         cursor.execute("SELECT * FROM test_source.meta")
         self.assertEqual(cursor.fetchone(), {
             "id": 1,
             "name": "yep",
             "flag": 1,
             "spend": 3.50,
+            "people": '["mary", "tom"]',
             "stuff": '[1, {"relations.io": {"1": "sure"}}]',
             "things": '{"for": [{"1": "yep"}]}',
             "things__for__0___1": "yep"
@@ -874,7 +882,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(query.wheres, '`id` IS NOT NULL')
         self.assertEqual(values, [])
 
-        # JSON
+        # PATH
 
         field = relations.Field(dict, name='meta')
         self.source.field_init(field)
@@ -948,6 +956,35 @@ class TestSource(unittest.TestCase):
         self.source.field_retrieve(field, query, values)
         self.assertEqual(query.wheres, "`id`<=%s")
         self.assertEqual(values, [1])
+
+        # json
+
+        field = relations.Field(set, store="meta")
+        self.source.field_init(field)
+        field.filter({"2", "1"})
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, "`meta`=CAST(%s AS JSON)")
+        self.assertEqual(values, ['["1", "2"]'])
+
+        field = relations.Field(list, store="meta")
+        self.source.field_init(field)
+        field.filter(["2", "1"])
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, "`meta`=CAST(%s AS JSON)")
+        self.assertEqual(values, ['["2", "1"]'])
+
+        field = relations.Field(dict, store="meta")
+        self.source.field_init(field)
+        field.filter({"a": "1"})
+        query = relations.query.Query()
+        values = []
+        self.source.field_retrieve(field, query, values)
+        self.assertEqual(query.wheres, "`meta`=CAST(%s AS JSON)")
+        self.assertEqual(values, ['{"a": "1"}'])
 
         # has
 
@@ -1173,7 +1210,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(model.name, ["things"])
         self.assertTrue(model.overflow)
 
-        Meta("yep", True, 1.1, [1, None], {"a": 1}).create()
+        Meta("yep", True, 1.1, {}, [1, None], {"a": 1}).create()
         model = Meta.one(name="yep")
 
         self.assertEqual(model.flag, True)
@@ -1187,7 +1224,16 @@ class TestSource(unittest.TestCase):
         self.assertEqual(Unit.many().sort("-name").limit(0).name, [])
         self.assertEqual(Unit.many(name="people").limit(1).name, ["people"])
 
-        Meta("dive", stuff=[1, 2, 3, None], things={"a": {"b": [1, 2], "c": "sure"}, "4": 5, "for": [{"1": "yep"}]}).create()
+        Meta("dive", people={"tom", "mary"}, stuff=[1, 2, 3, None], things={"a": {"b": [1, 2], "c": "sure"}, "4": 5, "for": [{"1": "yep"}]}).create()
+
+        model = Meta.many(people={"tom", "mary"})
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(stuff=[1, 2, 3, {"relations.io": {"1": None}}])
+        self.assertEqual(model[0].name, "dive")
+
+        model = Meta.many(things={"a": {"b": [1, 2], "c": "sure"}, "4": 5, "for": [{"1": "yep"}]})
+        self.assertEqual(model[0].name, "dive")
 
         model = Meta.many(stuff__1=2)
         self.assertEqual(model[0].name, "dive")
@@ -1232,6 +1278,24 @@ class TestSource(unittest.TestCase):
         self.assertEqual(len(model), 1)
 
         model = Meta.many(things__a__b__all=[3, 2, 1])
+        self.assertEqual(len(model), 0)
+
+        model = Meta.many(people__has="tom")
+        self.assertEqual(len(model), 1)
+
+        model = Meta.many(people__has="dick")
+        self.assertEqual(len(model), 0)
+
+        model = Meta.many(people__any=["tom", "dick"])
+        self.assertEqual(len(model), 1)
+
+        model = Meta.many(people__any=["harry", "dick"])
+        self.assertEqual(len(model), 0)
+
+        model = Meta.many(people__all=["mary", "tom"])
+        self.assertEqual(len(model), 1)
+
+        model = Meta.many(people__all=["tom", "dick", "mary"])
         self.assertEqual(len(model), 0)
 
         Net(ip="1.2.3.4", subnet="1.2.3.0/24").create()
@@ -1360,7 +1424,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(unit.test[0].id, 1)
         self.assertEqual(unit.test[0].name, "moar")
 
-        Meta("yep", True, 1.1, [1, None], {"a": 1}).create()
+        Meta("yep", True, 1.1, {"tom"}, [1, None], {"a": 1}).create()
         Meta.one(name="yep").set(flag=False, stuff=[], things={}).update()
 
         model = Meta.one(name="yep")
