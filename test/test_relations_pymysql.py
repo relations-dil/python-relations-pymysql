@@ -1210,11 +1210,12 @@ class TestSource(unittest.TestCase):
         self.assertEqual(model.name, ["things"])
         self.assertTrue(model.overflow)
 
-        Meta("yep", True, 1.1, {}, [1, None], {"a": 1}).create()
+        Meta("yep", True, 1.1, {"tom"}, [1, None], {"a": 1}).create()
         model = Meta.one(name="yep")
 
         self.assertEqual(model.flag, True)
         self.assertEqual(model.spend, 1.1)
+        self.assertEqual(model.people, {"tom"})
         self.assertEqual(model.stuff, [1, {"relations.io": {"1": None}}])
         self.assertEqual(model.things, {"a": 1})
 
@@ -1280,13 +1281,13 @@ class TestSource(unittest.TestCase):
         model = Meta.many(things__a__b__all=[3, 2, 1])
         self.assertEqual(len(model), 0)
 
-        model = Meta.many(people__has="tom")
+        model = Meta.many(people__has="mary")
         self.assertEqual(len(model), 1)
 
         model = Meta.many(people__has="dick")
         self.assertEqual(len(model), 0)
 
-        model = Meta.many(people__any=["tom", "dick"])
+        model = Meta.many(people__any=["mary", "dick"])
         self.assertEqual(len(model), 1)
 
         model = Meta.many(people__any=["harry", "dick"])
