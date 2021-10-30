@@ -21,7 +21,7 @@ ENVIRONMENT=-e MYSQL_HOST=$(MYSQL_HOST) \
 .PHONY: build network mysql shell debug test lint setup tag untag
 
 build:
-	docker build --no-cache . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
+	docker build . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
 
 network:
 	-docker network create $(NETWORK)

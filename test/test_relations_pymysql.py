@@ -219,6 +219,25 @@ class TestSource(unittest.TestCase):
         model = Simple([["sure"], ["fine"]])
         self.assertRaisesRegex(relations.ModelError, "only one create query at a time", model.query)
 
+    def test_create_id(self):
+
+        self.source.execute(Simple.define())
+        self.source.execute(Plain.define())
+        self.source.execute(Meta.define())
+
+        simple = Simple("sure")
+
+        query = self.source.create_query(simple)
+
+        cursor = self.source.connection.cursor()
+
+        self.source.create_id(cursor, simple, query)
+
+        cursor.execute("SELECT * FROM test_source.simple")
+        self.assertEqual(cursor.fetchone()["id"], simple.id)
+
+        cursor.close()
+
     def test_model_create(self):
 
         simple = Simple("sure")
@@ -251,16 +270,16 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
-        Meta("yep", True, 3.50, {"tom", "mary"}, [1, None], {"for": [{"1": "yep"}]}, "sure").create()
+        model = Meta("yep", True, 3.50, {"tom", "mary"}, [1, None], {"for": [{"1": "yep"}]}, "sure").create()
         cursor.execute("SELECT * FROM test_source.meta")
-        self.assertEqual(cursor.fetchone(), {
+        self.assertEqual(self.source.values_retrieve(model, cursor.fetchone()), {
             "id": 1,
             "name": "yep",
             "flag": 1,
             "spend": 3.50,
-            "people": '["mary", "tom"]',
-            "stuff": '[1, {"relations.io": {"1": "sure"}}]',
-            "things": '{"for": [{"1": "yep"}]}',
+            "people": ["mary", "tom"],
+            "stuff": [1, {"relations.io": {"1": "sure"}}],
+            "things": {"for": [{"1": "yep"}]},
             "things__for__0____1": "yep"
         })
 

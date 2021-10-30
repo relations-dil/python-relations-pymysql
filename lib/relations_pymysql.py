@@ -123,7 +123,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if model.STORE is None:
             model.STORE = model.NAME
 
-        if model._id is not None and model._fields._names[model._id].auto is None:
+        if model._id is not None and model._fields._names[model._id].auto is None and model._fields._names[model._id].kind == int:
             model._fields._names[model._id].auto = True
 
     def model_define(self, migration=None, definition=None):
@@ -154,6 +154,16 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return query
 
+    def create_id(self, cursor, model, query):
+        """
+        Inserts a single record and sets the id
+        """
+
+        query.generate()
+        cursor.execute(query.sql, tuple(query.args))
+
+        model[model._id] = cursor.lastrowid
+
     def model_create(self, model, query=None):
         """
         Executes the create
@@ -164,9 +174,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if not model._bulk and model._id is not None and model._fields._names[model._id].auto:
             for creating in model._each("create"):
                 create_query = query or self.create_query(creating)
-                create_query.generate()
-                cursor.execute(create_query.sql, tuple(create_query.args))
-                creating[model._id] = cursor.lastrowid
+                self.create_id(cursor, creating, create_query)
         else:
             create_query = query or self.create_query(model)
             create_query.generate()
@@ -191,7 +199,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return model
 
-    def field_retrieve(self, field, query): # pylint: disable=too-many-branches,too-many-statements
+    def field_retrieve(self, field, query):
         """
         Adds where caluse to query
         """
@@ -324,7 +332,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Encodes the fields in json if needed
         """
         for field in model._fields._order:
-            if values.get(field.store) is not None and field.kind not in [bool, int, float, str]:
+            if isinstance(values.get(field.store), str) and field.kind not in [bool, int, float, str]:
                 values[field.store] = json.loads(values[field.store])
 
         return values
@@ -592,7 +600,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             STORE = "_relations_migration"
             UNIQUE = False
 
-            stamp = str, {"auto": False}
+            stamp = str
 
         migrated = False
 
