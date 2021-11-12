@@ -13,6 +13,7 @@ import pymysql.cursors
 import ipaddress
 
 import relations
+import relations_sql
 import relations_pymysql
 
 class SourceModel(relations.Model):
@@ -36,8 +37,8 @@ class Meta(SourceModel):
     spend = float
     people = set
     stuff = list
-    things = dict, {"extract": "for__0___1"}
-    push = str, {"inject": "stuff__-1__relations.io___1"}
+    things = dict, {"extract": "for__0____1"}
+    push = str, {"inject": "stuff___1__relations.io____1"}
 
 def subnet_attr(values, value):
 
@@ -149,122 +150,28 @@ class TestSource(unittest.TestCase):
         del relations.SOURCES["test"]
         pymysql.connect.return_value.close.assert_called_once_with()
 
-    def test_table(self):
+    def test_execute(self):
 
-        model = {
-            "table": "people"
-        }
-        self.assertEqual(self.source.table(model), "`test_source`.`people`")
+        self.source.execute("")
 
-        model["schema"] = "stuff"
-        self.assertEqual(self.source.table(model), "`stuff`.`people`")
+        self.source.execute(relations_sql.SQL("""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
+  `id` BIGINT AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE `name` (`name`)
+);"""))
 
-        model = unittest.mock.MagicMock()
-        model.SCHEMA = None
+        cursor = self.source.connection.cursor()
 
-        model.TABLE = "people"
-        self.assertEqual(self.source.table(model), "`test_source`.`people`")
+        cursor.execute("DESCRIBE `test_source`.`simple`")
 
-        model.SCHEMA = "stuff"
-        self.assertEqual(self.source.table(model), "`stuff`.`people`")
+        id = cursor.fetchone()
+        self.assertEqual(id["Field"], "id")
+        self.assertEqual(id["Type"], "bigint(20)")
 
-    def test_encode(self):
-
-        model = unittest.mock.MagicMock()
-        people = unittest.mock.MagicMock()
-        stuff = unittest.mock.MagicMock()
-        things = unittest.mock.MagicMock()
-
-        people.kind = str
-        stuff.kind = list
-        things.kind = dict
-
-        people.store = "people"
-        stuff.store = "stuff"
-        things.store = "things"
-
-        model._fields._order = [people, stuff, things]
-
-        values = {
-            "people": "sure",
-            "stuff": None,
-            "things": None
-        }
-
-        self.assertEqual(self.source.encode(model, values), {
-            "people": "sure",
-            "stuff": None,
-            "things": None
-        })
-
-        values = {
-            "people": "sure",
-            "stuff": [],
-            "things": {}
-        }
-
-        self.assertEqual(self.source.encode(model, values), {
-            "people": "sure",
-            "stuff": '[]',
-            "things": '{}'
-        })
-
-    def test_decode(self):
-
-        model = unittest.mock.MagicMock()
-        people = unittest.mock.MagicMock()
-        stuff = unittest.mock.MagicMock()
-        things = unittest.mock.MagicMock()
-
-        people.kind = str
-        stuff.kind = list
-        things.kind = dict
-
-        people.store = "people"
-        stuff.store = "stuff"
-        things.store = "things"
-
-        model._fields._order = [people, stuff, things]
-
-        values = {
-            "people": "sure",
-            "stuff": None,
-            "things": None
-        }
-
-        self.assertEqual(self.source.decode(model, values), {
-            "people": "sure",
-            "stuff": None,
-            "things": None
-        })
-
-        values = {
-            "people": "sure",
-            "stuff": '[]',
-            "things": '{}'
-        }
-
-        self.assertEqual(self.source.decode(model, values), {
-            "people": "sure",
-            "stuff": [],
-            "things": {}
-        })
-
-    def test_walk(self):
-
-        self.assertEqual(self.source.walk("a__b__0___1"), '$.a.b[0]."1"')
-
-    def test_field_init(self):
-
-        class Field:
-            pass
-
-        field = Field()
-
-        self.source.field_init(field)
-
-        self.assertIsNone(field.auto_increment)
-        self.assertIsNone(field.definition)
+        name = cursor.fetchone()
+        self.assertEqual(name["Field"], "name")
+        self.assertEqual(name["Type"], "varchar(255)")
 
     def test_model_init(self):
 
@@ -276,489 +183,69 @@ class TestSource(unittest.TestCase):
 
         self.source.model_init(model)
 
-        self.assertIn("QUERY", model.UNDEFINE)
-        self.assertIsNone(model.SCHEMA)
-        self.assertEqual(model.TABLE, "check")
-        self.assertEqual(model.QUERY.get(), "SELECT * FROM `test_source`.`check`")
-        self.assertIsNone(model.DEFINITION)
-        self.assertTrue(model._fields._names["id"].auto_increment)
+        self.assertEqual(model.SCHEMA, "test_source")
+        self.assertEqual(model.STORE, "check")
         self.assertTrue(model._fields._names["id"].auto)
-
-    def test_column_define(self):
-
-        # Specific
-
-        field = relations.Field(int, definition="id")
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "id")
-
-        # TINYINT
-
-        field = relations.Field(bool, store="_flag")
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT")
-
-        # TINYINT default
-
-        field = relations.Field(bool, store="_flag", default=False)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT NOT NULL DEFAULT 0")
-
-        # TINYINT none
-
-        field = relations.Field(bool, store="_flag", none=False)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_flag` TINYINT NOT NULL")
-
-        # BIGINT
-
-        field = relations.Field(int, store="_id")
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT")
-
-        # BIGINT default
-
-        field = relations.Field(int, store="_id", default=0)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT NOT NULL DEFAULT 0")
-
-        # BIGINT none
-
-        field = relations.Field(int, store="_id", none=False)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT NOT NULL")
-
-        # BIGINT auto_increment
-
-        field = relations.Field(int, store="_id", auto_increment=True)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT AUTO_INCREMENT")
-
-        # BIGINT full
-
-        field = relations.Field(int, store="_id", none=False, auto_increment=True, default=0)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`_id` BIGINT NOT NULL AUTO_INCREMENT DEFAULT 0")
-
-        # FLOAT
-
-        field = relations.Field(float, store="spend")
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`spend` DOUBLE")
-
-        # FLOAT default
-
-        field = relations.Field(float, store="spend", default=0.1)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`spend` DOUBLE NOT NULL DEFAULT 0.1")
-
-        # FLOAT none
-
-        field = relations.Field(float, store="spend", none=False)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`spend` DOUBLE NOT NULL")
-
-        # VARCHAR
-
-        field = relations.Field(str, name="name")
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(255)")
-
-        # VARCHAR length
-
-        field = relations.Field(str, name="name", length=32)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(32)")
-
-        # VARCHAR default
-
-        field = relations.Field(str, name="name", default='ya')
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(255) NOT NULL DEFAULT 'ya'")
-
-        # VARCHAR none
-
-        field = relations.Field(str, name="name", none=False)
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(255) NOT NULL")
-
-        # VARCHAR full
-
-        field = relations.Field(str, name="name", length=32, none=False, default='ya')
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), "`name` VARCHAR(32) NOT NULL DEFAULT 'ya'")
-
-        # JSON (set)
-
-        field = relations.Field(set, name='people')
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), '`people` JSON NOT NULL')
-
-        # JSON (list)
-
-        field = relations.Field(list, name='stuff')
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), '`stuff` JSON NOT NULL')
-
-        # JSON (dict)
-
-        field = relations.Field(dict, name='things')
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), '`things` JSON NOT NULL')
-
-        # JSON (anything)
-
-        field = relations.Field(ipaddress.IPv4Address, name='ip', attr="whatev")
-        self.source.field_init(field)
-        self.assertEqual(self.source.column_define(field.define()), '`ip` JSON')
-
-    def test_extract_define(self):
-
-        self.assertEqual(
-            self.source.extract_define('grab', 'a__b__0___1', 'bool'),
-            "`grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')"
-        )
-        self.assertEqual(
-            self.source.extract_define('grab', 'c__b__0___1', 'int'),
-            "`grab__c__b__0___1` BIGINT AS (`grab`->>'$.c.b[0].\"1\"')"
-        )
-        self.assertEqual(
-            self.source.extract_define('grab', 'c__d__0___1', 'float'),
-            "`grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')"
-        )
-        self.assertEqual(
-            self.source.extract_define('grab', 'c__d__1___1', 'str'),
-            "`grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')"
-        )
-        self.assertEqual(
-            self.source.extract_define('grab', 'c__d__1___2', 'dict'),
-            "`grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
-        )
-
-    def test_field_define(self):
-
-        # EXTRACTED
-
-        field = relations.Field(dict, name='grab', extract={
-            "a__b__0___1": bool,
-            "c__b__0___1": int,
-            "c__d__0___1": float,
-            "c__d__1___1": str,
-            "c__d__1___2": list
-        })
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, [
-            "`grab` JSON NOT NULL",
-            "`grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')",
-            "`grab__c__b__0___1` BIGINT AS (`grab`->>'$.c.b[0].\"1\"')",
-            "`grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')",
-            "`grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')",
-            "`grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
-        ])
-
-        # (not) EXTRACTED
-
-        field = relations.Field(dict, name='grab', extract={
-            "a__b__0___1": bool,
-            "c__b__0___1": int,
-            "c__d__0___1": float,
-            "c__d__1___1": str,
-            "c__d__1___2": list
-        })
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions, extract=False)
-        self.assertEqual(definitions, [
-            "`grab` JSON NOT NULL"
-        ])
-
-        # INJECTED
-
-        field = relations.Field(str, name='toss', inject="things__a__b__0___1")
-        self.source.field_init(field)
-        definitions = []
-        self.source.field_define(field.define(), definitions)
-        self.assertEqual(definitions, [])
-
-    def test_index_define(self):
-
-        self.assertEqual(self.source.index_define("id-name", ["id", "name"]), "INDEX `id_name` (`id`,`name`)")
-        self.assertEqual(self.source.index_define("id-name", ["id", "name"], True), "UNIQUE `id_name` (`id`,`name`)")
 
     def test_model_define(self):
 
-        class Simple(relations.Model):
-
-            SOURCE = "PyMySQLSource"
-            DEFINITION = "whatever"
-
-            id = int
-            name = str
-
-            INDEX = ["id", "name"]
-
-        self.assertEqual(self.source.model_define(Simple.thy().define()), ["whatever"])
-
-        Simple.DEFINITION = None
-        self.assertEqual(self.source.model_define(Simple.thy().define()), ["""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` BIGINT AUTO_INCREMENT,
-  `name` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE `name` (`name`),
-  INDEX `id_name` (`id`,`name`)
-)"""])
-
-        cursor = self.source.connection.cursor()
-        cursor.execute(self.source.model_define(Simple.thy().define())[0])
-        cursor.close()
-
-    def test_field_add(self):
-
-        # EXTRACTED
-
-        field = relations.Field(dict, name='grab', extract={
-            "a__b__0___1": bool,
-            "c__b__0___1": int,
-            "c__d__0___1": float,
-            "c__d__1___1": str,
-            "c__d__1___2": list
-        })
-        self.source.field_init(field)
-        migrations = []
-        self.source.field_add(field.define(), migrations)
-        self.assertEqual(migrations, [
-            "ADD `grab` JSON NOT NULL",
-            "ADD `grab__a__b__0___1` TINYINT AS (`grab`->>'$.a.b[0].\"1\"')",
-            "ADD `grab__c__b__0___1` BIGINT AS (`grab`->>'$.c.b[0].\"1\"')",
-            "ADD `grab__c__d__0___1` DOUBLE AS (`grab`->>'$.c.d[0].\"1\"')",
-            "ADD `grab__c__d__1___1` VARCHAR(255) AS (`grab`->>'$.c.d[1].\"1\"')",
-            "ADD `grab__c__d__1___2` JSON AS (`grab`->>'$.c.d[1].\"2\"')"
-        ])
-
-        # INJECTED
-
-        field = relations.Field(str, name='toss', inject="things__a__b__0___1")
-        self.source.field_init(field)
-        migrations = []
-        self.source.field_add(field.define(), migrations)
-        self.assertEqual(migrations, [])
-
-    def test_field_remove(self):
-
-        # EXTRACTED
-
-        field = relations.Field(dict, name='grab', extract={
-            "a__b__0___1": bool,
-            "c__b__0___1": int,
-            "c__d__0___1": float,
-            "c__d__1___1": str,
-            "c__d__1___2": list
-        })
-        self.source.field_init(field)
-        migrations = []
-        self.source.field_remove(field.define(), migrations)
-        self.assertEqual(migrations, [
-            "DROP `grab`",
-            "DROP `grab__a__b__0___1`",
-            "DROP `grab__c__b__0___1`",
-            "DROP `grab__c__d__0___1`",
-            "DROP `grab__c__d__1___1`",
-            "DROP `grab__c__d__1___2`"
-        ])
-
-        # INJECTED
-
-        field = relations.Field(str, name='toss', inject="things__a__b__0___1")
-        self.source.field_init(field)
-        migrations = []
-        self.source.field_remove(field.define(), migrations)
-        self.assertEqual(migrations, [])
-
-    def test_field_change(self):
-
-        # EXTRACTED
-
-        field = relations.Field(dict, name='grab', extract={
-            "a__b__0___1": bool,
-            "c__b__0___1": int,
-            "c__d__0___1": float,
-            "c__d__1___1": str,
-            "c__d__1___2": list
-        })
-        self.source.field_init(field)
-        definition = field.define()
-        migration = {
-            "store": "bag",
-            "extract": {
-                "a__b__0___1": 'bool',
-                "c__b__0___1": 'int',
-                "c__d__0___1": 'float',
-                "c__d__2___1": 'str',
-                "c__d__1___2": 'str'
-            }
-        }
-        migrations = []
-        self.source.field_change(definition, migration, migrations)
-        self.assertEqual(migrations, [
-            "CHANGE `grab` `bag` JSON NOT NULL",
-            "DROP `grab__c__d__1___1`",
-            "CHANGE `grab__a__b__0___1` `bag__a__b__0___1` TINYINT AS (`bag`->>'$.a.b[0].\"1\"')",
-            "CHANGE `grab__c__b__0___1` `bag__c__b__0___1` BIGINT AS (`bag`->>'$.c.b[0].\"1\"')",
-            "CHANGE `grab__c__d__0___1` `bag__c__d__0___1` DOUBLE AS (`bag`->>'$.c.d[0].\"1\"')",
-            "CHANGE `grab__c__d__1___2` `bag__c__d__1___2` VARCHAR(255) AS (`bag`->>'$.c.d[1].\"2\"')",
-            "ADD `bag__c__d__2___1` VARCHAR(255) AS (`bag`->>'$.c.d[2].\"1\"')"
-        ])
-
-        # INJECTED
-
-        field = relations.Field(str, name='toss', inject="things__a__b__0___1")
-        self.source.field_init(field)
-        definition = field.define()
-        migration = {**definition, "store": "bag"}
-        migrations = []
-        self.source.field_change(definition, migration, migrations)
-        self.assertEqual(migrations, [])
-
-    def test_model_add(self):
-
-        self.assertEqual(self.source.model_add(Simple.thy().define()), ["""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
+        self.assertEqual(self.source.model_define(Simple.thy().define()),
+"""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
   `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE `name` (`name`)
-)"""])
+);
+""")
 
         cursor = self.source.connection.cursor()
-        cursor.execute(self.source.model_add(Simple.thy().define())[0])
+        cursor.execute(self.source.model_define(Simple.thy().define()))
         cursor.close()
 
-    def test_model_remove(self):
+    def test_create_query(self):
 
-        self.assertEqual(self.source.model_remove(Simple.thy().define()), ["""DROP TABLE IF EXISTS `test_source`.`simple`"""])
+        query = Simple("sure").query()
+        query.generate()
+
+        self.assertEqual(query.sql, """INSERT INTO `test_source`.`simple` (`name`) VALUES (%s)""")
+        self.assertEqual(query.args, ["sure"])
+
+        query = Simple.bulk().add("sure").add("fine").query()
+        query.generate()
+
+        self.assertEqual(query.sql, """INSERT INTO `test_source`.`simple` (`name`) VALUES (%s),(%s)""")
+        self.assertEqual(query.args, ["sure", "fine"])
+
+        model = Simple([["sure"], ["fine"]])
+        self.assertRaisesRegex(relations.ModelError, "only one create query at a time", model.query)
+
+    def test_create_id(self):
+
+        self.source.execute(Simple.define())
+        self.source.execute(Plain.define())
+        self.source.execute(Meta.define())
+
+        simple = Simple("sure")
+
+        query = self.source.create_query(simple)
 
         cursor = self.source.connection.cursor()
-        cursor.execute(self.source.model_add(Simple.thy().define())[0])
-        cursor.execute(self.source.model_remove(Simple.thy().define())[0])
+
+        self.source.create_id(cursor, simple, query)
+
+        cursor.execute("SELECT * FROM test_source.simple")
+        self.assertEqual(cursor.fetchone()["id"], simple.id)
+
         cursor.close()
-
-    def test_model_change(self):
-
-        class Simple(relations.Model):
-
-            SOURCE = "PyMySQLSource"
-
-            id = int
-            name = str
-            fie = int
-            foe = int
-
-            UNIQUE = {
-                "foe": ["foe"],
-                "labels": ["name", "id"]
-            }
-            INDEX = {
-                "speedy": ["id", "name"],
-                "fie": ["fie"]
-            }
-
-        migration = {
-            "table": "simples",
-            "fields": {
-                "add": [
-                    {
-                        "name": "fee",
-                        "store": "fee",
-                        "kind": "int",
-                        "none": True
-                    }
-                ],
-                "remove": ["fie"],
-                "change": {
-                    "foe": {
-                        "name": "fum",
-                        "kind": "float"
-                    }
-                }
-            },
-            "unique": {
-                "add": {
-                    "fee": ["fee"]
-                },
-                "remove": ["foe"],
-                "rename": {
-                    "labels": "label"
-                }
-            },
-            "index": {
-                "add": {
-                    "foe-fee": ["foe", "fee"]
-                },
-                "remove": ["fie"],
-                "rename": {
-                    "speedy": "speed"
-                }
-            }
-        }
-
-        self.assertEqual(self.source.model_change(Simple.thy().define(), migration)[0], """ALTER TABLE `test_source`.`simple`
-  RENAME TO `test_source`.`simples`,
-  ADD `fee` BIGINT,
-  DROP `fie`,
-  CHANGE `foe` `foe` DOUBLE,
-  ADD UNIQUE `fee` (`fee`),
-  DROP INDEX `foe`,
-  RENAME INDEX `labels` TO `label`,
-  ADD INDEX `foe_fee` (`foe`,`fee`),
-  DROP INDEX `fie`,
-  RENAME INDEX `speedy` TO `speed`""")
-
-        cursor = self.source.connection.cursor()
-        cursor.execute(self.source.model_define(Simple.thy().define())[0])
-        cursor.execute(self.source.model_change(Simple.thy().define(), migration)[0])
-        cursor.close()
-
-    def test_field_create(self):
-
-        # Standard
-
-        field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        fields = []
-        clause = []
-        self.source.field_create( field, fields, clause)
-        self.assertEqual(fields, ["`id`"])
-        self.assertEqual(clause, ["%(id)s"])
-        self.assertFalse(field.changed)
-
-        # auto
-
-        field = relations.Field(int, name="id", auto=True)
-        self.source.field_init(field)
-        fields = []
-        clause = []
-        self.source.field_create( field, fields, clause)
-        self.assertEqual(fields, [])
-        self.assertEqual(clause, [])
-
-        # inject
-
-        field = relations.Field(int, name="id", inject=True)
-        self.source.field_init(field)
-        fields = []
-        clause = []
-        self.source.field_create( field, fields, clause)
-        self.assertEqual(fields, [])
-        self.assertEqual(clause, [])
 
     def test_model_create(self):
 
         simple = Simple("sure")
         simple.plain.add("fine")
 
-        cursor = self.source.connection.cursor()
-        [cursor.execute(statement) for statement in Simple.define() + Plain.define() + Meta.define()]
+        self.source.execute(Simple.define())
+        self.source.execute(Plain.define())
+        self.source.execute(Meta.define())
 
         simple.create()
 
@@ -768,6 +255,8 @@ class TestSource(unittest.TestCase):
         self.assertEqual(simple.plain[0].simple_id, 1)
         self.assertEqual(simple.plain._action, "update")
         self.assertEqual(simple.plain[0]._record._action, "update")
+
+        cursor = self.source.connection.cursor()
 
         cursor.execute("SELECT * FROM test_source.simple")
         self.assertEqual(cursor.fetchone(), {"id": 1, "name": "sure"})
@@ -781,321 +270,110 @@ class TestSource(unittest.TestCase):
         cursor.execute("SELECT * FROM test_source.plain")
         self.assertEqual(cursor.fetchone(), {"simple_id": 1, "name": "fine"})
 
-        Meta("yep", True, 3.50, {"tom", "mary"}, [1, None], {"for": [{"1": "yep"}]}, "sure").create()
+        model = Meta("yep", True, 3.50, {"tom", "mary"}, [1, None], {"for": [{"1": "yep"}]}, "sure").create()
         cursor.execute("SELECT * FROM test_source.meta")
-        self.assertEqual(cursor.fetchone(), {
+        self.assertEqual(self.source.values_retrieve(model, cursor.fetchone()), {
             "id": 1,
             "name": "yep",
             "flag": 1,
             "spend": 3.50,
-            "people": '["mary", "tom"]',
-            "stuff": '[1, {"relations.io": {"1": "sure"}}]',
-            "things": '{"for": [{"1": "yep"}]}',
-            "things__for__0___1": "yep"
+            "people": ["mary", "tom"],
+            "stuff": [1, {"relations.io": {"1": "sure"}}],
+            "things": {"for": [{"1": "yep"}]},
+            "things__for__0____1": "yep"
         })
 
         cursor.close()
 
     def test_field_retrieve(self):
 
-        # IN
-
-        field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        field.filter([1, 2, 3], "in")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id` IN (%s,%s,%s)")
-        self.assertEqual(values, [1, 2, 3])
-
-        field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        field.filter([], "in")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "FALSE")
-        self.assertEqual(values, [])
-
-        # NOT IN
-
-        field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        field.filter([1, 2, 3], "ne")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id` NOT IN (%s,%s,%s)")
-        self.assertEqual(values, [1, 2, 3])
-
-        field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        field.filter([], "ne")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "TRUE")
-        self.assertEqual(values, [])
-
-        # LIKE
-
-        field = relations.Field(int, name='id')
-        self.source.field_init(field)
-        field.filter(1, 'like')
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, '`id` LIKE %s')
-        self.assertEqual(values, ["%1%"])
-
-        # NOT LIKE
-
-        field = relations.Field(int, name='id')
-        self.source.field_init(field)
-        field.filter(1, 'notlike')
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, '`id` NOT LIKE %s')
-        self.assertEqual(values, ["%1%"])
-
-        # IS NULL
-
-        field = relations.Field(int, name='id')
-        self.source.field_init(field)
-        field.filter(True, 'null')
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, '`id` IS NULL')
-        self.assertEqual(values, [])
-
-        # IS NOT NULL
-
-        field = relations.Field(int, name='id')
-        self.source.field_init(field)
-        field.filter(False, 'null')
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, '`id` IS NOT NULL')
-        self.assertEqual(values, [])
-
-        # PATH
-
-        field = relations.Field(dict, name='meta')
-        self.source.field_init(field)
-        field.filter(1, 'a__b__0___1')
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`meta`->>%s=%s")
-        self.assertEqual(values, ['$.a.b[0]."1"', 1])
-
-        field = relations.Field(dict, name='meta', extract="a__b__0___1")
-        self.source.field_init(field)
-        field.filter(1, 'a__b__0___1')
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`meta__a__b__0___1`=%s")
-        self.assertEqual(values, [1])
-
-        # =
-
         field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1)
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id`=%s")
-        self.assertEqual(values, [1])
+        query = self.source.SELECT()
+        self.source.field_retrieve(field, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE `id`=%s""")
+        self.assertEqual(query.args, [1])
 
-        # >
-
-        field = relations.Field(int, name="id")
+        field = relations.Field(dict, name="things", extract={"for__0____1": str})
         self.source.field_init(field)
-        field.filter(1, "gt")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id`>%s")
-        self.assertEqual(values, [1])
+        field.filter({"a": 1})
+        query = self.source.SELECT()
+        self.source.field_retrieve(field, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE `things`=CAST(%s AS JSON)""")
+        self.assertEqual(query.args, ['{"a": 1}'])
 
-        # >=
-
-        field = relations.Field(int, name="id")
+        field = relations.Field(dict, name="things", extract={"for__0____1": str})
         self.source.field_init(field)
-        field.filter(1, "gte")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id`>=%s")
-        self.assertEqual(values, [1])
+        field.filter("yes", "a__b")
+        query = self.source.SELECT()
+        self.source.field_retrieve(field, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE `things`->>%s=%s""")
+        self.assertEqual(query.args, ['$.a.b', 'yes'])
 
-        # <
-
-        field = relations.Field(int, name="id")
+        field = relations.Field(dict, name="things", extract={"for__0____1": str})
         self.source.field_init(field)
-        field.filter(1, "lt")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id`<%s")
-        self.assertEqual(values, [1])
+        field.filter("yes", "for__0____1")
+        query = self.source.SELECT()
+        self.source.field_retrieve(field, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE `things__for__0____1`=%s""")
+        self.assertEqual(query.args, ['yes'])
 
-        # <=
+    def test_like(self):
 
-        field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        field.filter(1, "lte")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`id`<=%s")
-        self.assertEqual(values, [1])
-
-        # json
-
-        field = relations.Field(set, store="meta")
-        self.source.field_init(field)
-        field.filter({"2", "1"})
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`meta`=CAST(%s AS JSON)")
-        self.assertEqual(values, ['["1", "2"]'])
-
-        field = relations.Field(list, store="meta")
-        self.source.field_init(field)
-        field.filter(["2", "1"])
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`meta`=CAST(%s AS JSON)")
-        self.assertEqual(values, ['["2", "1"]'])
-
-        field = relations.Field(dict, store="meta")
-        self.source.field_init(field)
-        field.filter({"a": "1"})
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "`meta`=CAST(%s AS JSON)")
-        self.assertEqual(values, ['{"a": "1"}'])
-
-        # has
-
-        field = relations.Field(list, store="meta")
-        self.source.field_init(field)
-        field.filter("1", "has")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "JSON_CONTAINS(`meta`, %s)")
-        self.assertEqual(values, ['["1"]'])
-
-        field = relations.Field(dict, store="meta")
-        self.source.field_init(field)
-        field.filter("1", "a__has")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "JSON_CONTAINS(`meta`->>%s, %s)")
-        self.assertEqual(values, ['$.a', '["1"]'])
-
-        # any
-
-        field = relations.Field(list, store="meta")
-        self.source.field_init(field)
-        field.filter(["1", "2"], "any")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "(JSON_CONTAINS(`meta`, %s) OR JSON_CONTAINS(`meta`, %s))")
-        self.assertEqual(values, ['"1"', '"2"'])
-
-        field = relations.Field(dict, store="meta")
-        self.source.field_init(field)
-        field.filter(["1", "2"], "a__any")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "(JSON_CONTAINS(`meta`->>%s, %s) OR JSON_CONTAINS(`meta`->>%s, %s))")
-        self.assertEqual(values, ['$.a', '"1"', '$.a', '"2"'])
-
-        # all
-
-        field = relations.Field(list, store="meta")
-        self.source.field_init(field)
-        field.filter(["1", "2"], "all")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "JSON_CONTAINS(`meta`, %s) AND JSON_LENGTH(`meta`)=%s")
-        self.assertEqual(values, ['["1", "2"]', 2])
-
-        field = relations.Field(dict, store="meta")
-        self.source.field_init(field)
-        field.filter(["1", "2"], "a__all")
-        query = relations.query.Query()
-        values = []
-        self.source.field_retrieve(field, query, values)
-        self.assertEqual(query.wheres, "JSON_CONTAINS(`meta`->>%s, %s) AND JSON_LENGTH(`meta`->>%s)=%s")
-        self.assertEqual(values, ['$.a', '["1", "2"]', '$.a', 2])
-
-    def test_model_like(self):
-
-        cursor = self.source.connection.cursor()
-
-        [cursor.execute(statement) for statement in Unit.define() + Test.define() + Case.define() + Meta.define() + Net.define()]
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Meta.define())
+        self.source.execute(Net.define())
 
         Unit([["stuff"], ["people"]]).create()
 
         unit = Unit.one()
-
-        query = copy.deepcopy(unit.QUERY)
-        values = []
-        self.source.model_like(unit, query, values)
-        self.assertEqual(query.wheres, '')
-        self.assertEqual(values, [])
+        query = self.source.SELECT()
+        self.source.like(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT """)
+        self.assertEqual(query.args, [])
 
         unit = Unit.one(like="p")
-        query = copy.deepcopy(unit.QUERY)
-        values = []
-        self.source.model_like(unit, query, values)
-        self.assertEqual(query.wheres, '(`name` LIKE %s)')
-        self.assertEqual(values, ['%p%'])
+        query = self.source.SELECT()
+        self.source.like(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE (`name` LIKE %s)""")
+        self.assertEqual(query.args, ['%p%'])
 
         unit = Unit.one(name="people")
         unit.test.add("things")[0]
         unit.update()
 
         test = Test.many(like="p")
-        query = copy.deepcopy(test.QUERY)
-        values = []
-        self.source.model_like(test, query, values)
-        self.assertEqual(query.wheres, '(`unit_id` IN (%s) OR `name` LIKE %s)')
-        self.assertEqual(values, [unit.id, '%p%'])
+        query = self.source.SELECT()
+        self.source.like(test, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE (`unit_id` IN (%s) OR `name` LIKE %s)""")
+        self.assertEqual(query.args, [unit.id, '%p%'])
         self.assertFalse(test.overflow)
 
         test = Test.many(like="p", _chunk=1)
-        query = copy.deepcopy(test.QUERY)
-        values = []
-        self.source.model_like(test, query, values)
-        self.assertEqual(query.wheres, '(`unit_id` IN (%s) OR `name` LIKE %s)')
-        self.assertEqual(values, [unit.id, '%p%'])
+        query = self.source.SELECT()
+        self.source.like(test, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE (`unit_id` IN (%s) OR `name` LIKE %s)""")
+        self.assertEqual(query.args, [unit.id, '%p%'])
         self.assertTrue(test.overflow)
 
         Unit.many().delete()
         test = Test.many(like="p")
-        query = copy.deepcopy(test.QUERY)
-        values = []
-        self.source.model_like(test, query, values)
-        self.assertEqual(query.wheres, '(`name` LIKE %s)')
-        self.assertEqual(values, ['%p%'])
+        query = self.source.SELECT()
+        self.source.like(test, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE (`name` LIKE %s)""")
+        self.assertEqual(query.args, ['%p%'])
 
         class Nut(SourceModel):
 
@@ -1108,55 +386,200 @@ class TestSource(unittest.TestCase):
             UNIQUE = False
 
         net = Nut.many(like="p")
-        query = copy.deepcopy(net.QUERY)
-        values = []
-        self.source.model_like(net, query, values)
-        self.assertEqual(query.wheres, '(`ip__address` LIKE %s OR `ip`->>%s LIKE %s OR `subnet`->>%s LIKE %s)')
-        self.assertEqual(values, ['%p%', '$.value', '%p%', '$.min_address', '%p%'])
+        query = self.source.SELECT()
+        self.source.like(net, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT WHERE (`ip__address` LIKE %s OR `ip`->>%s LIKE %s OR `subnet`->>%s LIKE %s)""")
+        self.assertEqual(query.args, ['%p%', '$.value', '%p%', '$.min_address', '%p%'])
 
-    def test_model_sort(self):
+    def test_sort(self):
 
         unit = Unit.one()
 
-        query = copy.deepcopy(unit.QUERY)
-        self.source.model_sort(unit, query)
-        self.assertEqual(query.order_bys, '`name`')
+        query = self.source.SELECT()
+        self.source.sort(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT ORDER BY `name` ASC""")
+        self.assertEqual(query.args, [])
 
         unit._sort = ['-id']
-        query = copy.deepcopy(unit.QUERY)
-        self.source.model_sort(unit, query)
-        self.assertEqual(query.order_bys, '`id` DESC')
+        query = self.source.SELECT()
+        self.source.sort(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT ORDER BY `id` DESC""")
+        self.assertEqual(query.args, [])
         self.assertIsNone(unit._sort)
 
-    def test_model_limit(self):
+    def test_limit(self):
 
         unit = Unit.one()
 
-        query = copy.deepcopy(unit.QUERY)
-        values = []
-        self.source.model_limit(unit, query, values)
-        self.assertEqual(query.limits, '')
-        self.assertEqual(values, [])
+        query = self.source.SELECT()
+        self.source.limit(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT """)
+        self.assertEqual(query.args, [])
 
+        query = self.source.SELECT()
         unit._limit = 2
-        query = copy.deepcopy(unit.QUERY)
-        values = []
-        self.source.model_limit(unit, query, values)
-        self.assertEqual(query.limits, '%s')
-        self.assertEqual(values, [2])
+        self.source.limit(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT LIMIT %s""")
+        self.assertEqual(query.args, [2])
 
+        query = self.source.SELECT()
         unit._offset = 1
-        query = copy.deepcopy(unit.QUERY)
-        values = []
-        self.source.model_limit(unit, query, values)
-        self.assertEqual(query.limits, '%s, %s')
-        self.assertEqual(values, [1, 2])
+        self.source.limit(unit, query)
+        query.generate()
+        self.assertEqual(query.sql, """SELECT LIMIT %s OFFSET %s""")
+        self.assertEqual(query.args, [2, 1])
+
+    def test_count_query(self):
+
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+
+        Unit([["stuff"], ["people"]]).create()
+
+        models = Unit.one(name__in=["people", "stuff"])
+        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+
+        model = Unit.one(name="things")
+        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+
+        self.assertIsNone(model.retrieve(False))
+
+        unit = Unit.one(name="people")
+
+        self.assertEqual(unit.id, 2)
+        self.assertEqual(unit._action, "update")
+        self.assertEqual(unit._record._action, "update")
+
+        unit.test.add("things")[0].case.add("persons")
+        unit.update()
+
+        model = Unit.many(test__name="things", like="p")
+
+        query = self.source.count_query(model)
+
+        query.generate(indent=2)
+
+        self.assertEqual(query.sql,
+"""SELECT
+  COUNT(*) AS `total`
+FROM
+  `test_source`.`unit`
+WHERE
+  `id` IN (
+    %s
+  ) AND
+  (
+    `name` LIKE %s
+  )""")
+        self.assertEqual(query.args, [2, '%p%'])
+
+    def test_retrieve_query(self):
+
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+
+        Unit([["stuff"], ["people"]]).create()
+
+        models = Unit.one(name__in=["people", "stuff"])
+        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+
+        model = Unit.one(name="things")
+        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+
+        self.assertIsNone(model.retrieve(False))
+
+        unit = Unit.one(name="people")
+
+        self.assertEqual(unit.id, 2)
+        self.assertEqual(unit._action, "update")
+        self.assertEqual(unit._record._action, "update")
+
+        unit.test.add("things")[0].case.add("persons")
+        unit.update()
+
+        model = Unit.many(test__name="things", like="p").limit(5)
+
+        query = self.source.retrieve_query(model)
+
+        query.generate(indent=2)
+
+        self.assertEqual(query.sql,
+"""SELECT
+  *
+FROM
+  `test_source`.`unit`
+WHERE
+  `id` IN (
+    %s
+  ) AND
+  (
+    `name` LIKE %s
+  )
+ORDER BY
+  `name` ASC
+LIMIT %s""")
+        self.assertEqual(query.args, [2, '%p%', 5])
+
+    def test_labels_query(self):
+
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+
+        Unit([["stuff"], ["people"]]).create()
+
+        models = Unit.one(name__in=["people", "stuff"])
+        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+
+        model = Unit.one(name="things")
+        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+
+        self.assertIsNone(model.retrieve(False))
+
+        unit = Unit.one(name="people")
+
+        self.assertEqual(unit.id, 2)
+        self.assertEqual(unit._action, "update")
+        self.assertEqual(unit._record._action, "update")
+
+        unit.test.add("things")[0].case.add("persons")
+        unit.update()
+
+        model = Unit.many(test__name="things", like="p").limit(5)
+
+        query = self.source.labels_query(model)
+
+        query.generate(indent=2)
+
+        self.assertEqual(query.sql,
+"""SELECT
+  *
+FROM
+  `test_source`.`unit`
+WHERE
+  `id` IN (
+    %s
+  ) AND
+  (
+    `name` LIKE %s
+  )
+ORDER BY
+  `name` ASC
+LIMIT %s""")
+        self.assertEqual(query.args, [2, '%p%', 5])
 
     def test_model_count(self):
 
-        cursor = self.source.connection.cursor()
-
-        [cursor.execute(statement) for statement in Unit.define() + Test.define() + Case.define()]
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
 
         Unit([["stuff"], ["people"]]).create()
 
@@ -1166,11 +589,54 @@ class TestSource(unittest.TestCase):
 
         self.assertEqual(Unit.many(like="p").count(), 1)
 
+    def test_values_retrieve(self):
+
+        model = unittest.mock.MagicMock()
+        people = unittest.mock.MagicMock()
+        stuff = unittest.mock.MagicMock()
+        things = unittest.mock.MagicMock()
+
+        people.kind = str
+        stuff.kind = list
+        things.kind = dict
+
+        people.store = "people"
+        stuff.store = "stuff"
+        things.store = "things"
+
+        model._fields._order = [people, stuff, things]
+
+        values = {
+            "people": "sure",
+            "stuff": None,
+            "things": None
+        }
+
+        self.assertEqual(self.source.values_retrieve(model, values), {
+            "people": "sure",
+            "stuff": None,
+            "things": None
+        })
+
+        values = {
+            "people": "sure",
+            "stuff": '[]',
+            "things": '{}'
+        }
+
+        self.assertEqual(self.source.values_retrieve(model, values), {
+            "people": "sure",
+            "stuff": [],
+            "things": {}
+        })
+
     def test_model_retrieve(self):
 
-        cursor = self.source.connection.cursor()
-
-        [cursor.execute(statement) for statement in Unit.define() + Test.define() + Case.define() + Meta.define() + Net.define()]
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Meta.define())
+        self.source.execute(Net.define())
 
         Unit([["stuff"], ["people"]]).create()
 
@@ -1248,7 +714,7 @@ class TestSource(unittest.TestCase):
         model = Meta.many(things__a__d__null=True)
         self.assertEqual(model[0].name, "dive")
 
-        model = Meta.many(things___4=5)
+        model = Meta.many(things____4=5)
         self.assertEqual(model[0].name, "dive")
 
         model = Meta.many(things__a__b__0__gt=1)
@@ -1260,7 +726,7 @@ class TestSource(unittest.TestCase):
         model = Meta.many(things__a__d__null=False)
         self.assertEqual(len(model), 0)
 
-        model = Meta.many(things___4=6)
+        model = Meta.many(things____4=6)
         self.assertEqual(len(model), 0)
 
         model = Meta.many(things__a__b__has=1)
@@ -1331,9 +797,11 @@ class TestSource(unittest.TestCase):
 
     def test_model_labels(self):
 
-        cursor = self.source.connection.cursor()
-
-        [cursor.execute(statement) for statement in Unit.define() + Test.define() + Case.define() + Meta.define() + Net.define()]
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Meta.define())
+        self.source.execute(Net.define())
 
         Unit("people").create().test.add("stuff").add("things").create()
 
@@ -1376,38 +844,64 @@ class TestSource(unittest.TestCase):
         # Standard
 
         field = relations.Field(int, name="id")
-        self.source.field_init(field)
-        clause = []
-        values = []
-        self.source.field_update(field, {"id": 1}, clause, values)
-        self.assertEqual(clause, ['`id`=%s'])
-        self.assertEqual(values, [1])
+        query = self.source.UPDATE("table")
+        self.source.field_update(field, {"id": 1}, query)
+        query.generate()
+        self.assertEqual(query.sql, """UPDATE `table` SET `id`=%s""")
+        self.assertEqual(query.args, [1])
 
         # Non standard
 
         field = relations.Field(dict, name="id")
-        self.source.field_init(field)
-        clause = []
-        values = []
-        self.source.field_update(field, {"id": {"a": 1}}, clause, values)
-        self.assertEqual(clause, ['`id`=%s'])
-        self.assertEqual(values, ['{"a": 1}'])
+        query = self.source.UPDATE("table")
+        self.source.field_update(field, {"id": {"a": 1}}, query)
+        query.generate()
+        self.assertEqual(query.sql, """UPDATE `table` SET `id`=CAST(%s AS JSON)""")
+        self.assertEqual(query.args, ['{"a": 1}'])
 
         # Non existent
 
         field = relations.Field(dict, name="id")
-        self.source.field_init(field)
-        clause = []
-        values = []
-        self.source.field_update(field, {}, clause, values)
-        self.assertEqual(clause, [])
-        self.assertEqual(values, [])
+        query = self.source.UPDATE("table")
+        self.source.field_update(field, {}, query)
+        query.generate()
+        self.assertEqual(query.sql, """UPDATE `table`""")
+        self.assertEqual(query.args, [])
+
+    def test_update_query(self):
+
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Plain.define())
+
+        query = Unit.many().set(name="fun").query("update")
+        query.generate()
+
+        self.assertEqual(query.sql, """UPDATE `test_source`.`unit` SET `name`=%s""")
+        self.assertEqual(query.args, ["fun"])
+
+        model = Unit([["people"], ["stuff"]]).create()
+
+        query = model[0].set(name="fun").query()
+        query.generate()
+
+        self.assertEqual(query.sql, """UPDATE `test_source`.`unit` SET `name`=%s WHERE `id`=%s""")
+        self.assertEqual(query.args, ["fun", model[0].id])
+
+        self.assertRaisesRegex(relations.ModelError, "only one update query at a time", model.query)
+
+        model = Plain(name="yep").create()
+
+        self.assertRaisesRegex(relations.ModelError, "nothing to update from", model.query)
 
     def test_model_update(self):
 
-        cursor = self.source.connection.cursor()
-
-        [cursor.execute(statement) for statement in Unit.define() + Test.define() + Case.define() + Meta.define() + Net.define()]
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Meta.define())
+        self.source.execute(Net.define())
 
         Unit([["people"], ["stuff"]]).create()
 
@@ -1450,11 +944,37 @@ class TestSource(unittest.TestCase):
         self.assertEqual(Net.one(ping.id).ip.compressed, "13.14.15.16")
         self.assertEqual(Net.one(pong.id).ip.compressed, "5.6.7.8")
 
+    def test_delete_query(self):
+
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Plain.define())
+
+        query = Unit.many().query("delete")
+        query.generate()
+
+        self.assertEqual(query.sql, """DELETE FROM `test_source`.`unit`""")
+        self.assertEqual(query.args, [])
+
+        model = Unit([["people"], ["stuff"]]).create()
+
+        query = model.query("delete")
+        query.generate()
+
+        self.assertEqual(query.sql, """DELETE FROM `test_source`.`unit` WHERE `id` IN (%s,%s)""")
+        self.assertEqual(query.args, model.id)
+
+        model = Plain(name="yep").create()
+
+        self.assertRaisesRegex(relations.ModelError, "nothing to delete from", model.query, "delete")
+
     def test_model_delete(self):
 
-        cursor = self.source.connection.cursor()
-
-        [cursor.execute(statement) for statement in Unit.define() + Test.define() + Case.define()]
+        self.source.execute(Unit.define())
+        self.source.execute(Test.define())
+        self.source.execute(Case.define())
+        self.source.execute(Plain.define())
 
         unit = Unit("people")
         unit.test.add("stuff").add("things")
@@ -1469,8 +989,6 @@ class TestSource(unittest.TestCase):
         self.assertEqual(len(Test.many()), 0)
 
         self.assertEqual(Test.many().delete(), 0)
-
-        [cursor.execute(statement) for statement in Plain.define()]
 
         plain = Plain(0, "nope").create()
         self.assertRaisesRegex(relations.ModelError, "plain: nothing to delete from", plain.delete)
@@ -1488,7 +1006,8 @@ class TestSource(unittest.TestCase):
         self.source.definition_convert("ddl/general.json", "ddl/sourced")
 
         with open("ddl/sourced/general.sql", 'r') as ddl_file:
-            self.assertEqual(ddl_file.read(), """CREATE TABLE IF NOT EXISTS `test_source`.`plain` (
+            self.assertEqual(ddl_file.read(),
+"""CREATE TABLE IF NOT EXISTS `test_source`.`plain` (
   `simple_id` BIGINT,
   `name` VARCHAR(255) NOT NULL,
   UNIQUE `simple_id_name` (`simple_id`,`name`)
@@ -1513,7 +1032,7 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
                         "definition": Simple.thy().define(),
                         "migration": {
                             "source": "PyMySQLSource",
-                            "table": "simples"
+                            "store": "simples"
                         }
                     }
                 }
@@ -1524,7 +1043,8 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
         self.source.migration_convert("ddl/general.json", "ddl/sourced")
 
         with open("ddl/sourced/general.sql", 'r') as ddl_file:
-            self.assertEqual(ddl_file.read(), """CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
+            self.assertEqual(ddl_file.read(),
+"""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
   `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`),
@@ -1533,32 +1053,8 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
 
 DROP TABLE IF EXISTS `test_source`.`simple`;
 
-ALTER TABLE `test_source`.`simple`
-  RENAME TO `test_source`.`simples`;
+RENAME TABLE `test_source`.`simple` TO `simples`;
 """)
-
-    def test_execute(self):
-
-        self.source.execute("")
-
-        self.source.execute("""CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
-  `id` BIGINT AUTO_INCREMENT,
-  `name` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE `name` (`name`)
-);""")
-
-        cursor = self.source.connection.cursor()
-
-        cursor.execute("DESCRIBE `test_source`.`simple`")
-
-        id = cursor.fetchone()
-        self.assertEqual(id["Field"], "id")
-        self.assertEqual(id["Type"], "bigint(20)")
-
-        name = cursor.fetchone()
-        self.assertEqual(name["Field"], "name")
-        self.assertEqual(name["Type"], "varchar(255)")
 
     def test_load(self):
 
@@ -1572,7 +1068,11 @@ ALTER TABLE `test_source`.`simple`
 
         self.source.load(f"ddl/{self.source.name}/{self.source.KIND}/definition.sql")
 
-        self.assertEqual(Unit.many().count(), 0)
+        cursor = self.source.connection.cursor()
+
+        cursor.execute("SELECT COUNT(*) as `total` FROM `test_source`.`unit`")
+
+        self.assertEqual(cursor.fetchone()["total"], 0)
 
     def test_list(self):
 

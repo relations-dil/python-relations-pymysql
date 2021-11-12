@@ -2,7 +2,7 @@
 Module for intersting with PyMySQL
 """
 
-# pylint: disable=arguments-differ
+# pylint: disable=arguments-differ,unsupported-membership-test
 
 import glob
 import copy
@@ -14,22 +14,35 @@ import pymysql
 import pymysql.cursors
 
 import relations
-import relations.query
+import relations_sql
+import relations_mysql
+
 
 class Source(relations.Source): # pylint: disable=too-many-public-methods
     """
     PyMySQL Source
     """
 
-    KIND = "mysql"
+    SQL = relations_sql.SQL
+    ASC = relations_sql.ASC
+    DESC = relations_sql.DESC
 
-    RETRIEVE = {
-        'eq': '=',
-        'gt': '>',
-        'gte': '>=',
-        'lt': '<',
-        'lte': '<='
-    }
+    LIKE = relations_mysql.LIKE
+    IN = relations_mysql.IN
+    OR = relations_mysql.OR
+    OP = relations_mysql.OP
+
+    AS = relations_mysql.AS
+    FIELDS = relations_mysql.FIELDS
+    TABLE = relations_mysql.TABLE
+    TABLE_NAME = relations_mysql.TABLE_NAME
+
+    INSERT = relations_mysql.INSERT
+    SELECT = relations_mysql.SELECT
+    UPDATE = relations_mysql.UPDATE
+    DELETE = relations_mysql.DELETE
+
+    KIND = "mysql"
 
     schema = None   # Database to use
     connections = None # Connections
@@ -72,80 +85,27 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
                 if connection:
                     connection.close()
 
-    def table(self, model):
+    def execute(self, commands):
         """
-        Get the full table name
-        """
-
-        if isinstance(model, dict):
-            schema = model.get("schema")
-            table = model['table']
-        else:
-            schema = model.SCHEMA
-            table = model.TABLE
-
-        name = []
-
-        if schema is not None:
-            name.append(f"`{schema}`")
-        elif self.schema is not None:
-            name.append(f"`{self.schema}`")
-
-        name.append(f"`{table}`")
-
-        return ".".join(name)
-
-    @staticmethod
-    def encode(model, values):
-        """
-        Encodes the fields in json if needed
-        """
-        for field in model._fields._order:
-            if values.get(field.store) is not None and field.kind not in [bool, int, float, str]:
-                values[field.store] = json.dumps(values[field.store])
-
-        return values
-
-    @staticmethod
-    def decode(model, values):
-        """
-        Encodes the fields in json if needed
-        """
-        for field in model._fields._order:
-            if values.get(field.store) is not None and field.kind not in [bool, int, float, str]:
-                values[field.store] = json.loads(values[field.store])
-
-        return values
-
-    @staticmethod
-    def walk(path):
-        """
-        Generates the JSON pathing for a field
+        Execute SQL
         """
 
-        if isinstance(path, str):
-            path = path.split('__')
+        if isinstance(commands, relations_sql.SQL):
+            commands.generate()
+            commands = commands.sql
 
-        places = []
+        if not isinstance(commands, list):
+            commands = commands.split(";\n")
 
-        for place in path:
+        cursor = self.connection.cursor()
 
-            if relations.INDEX.match(place):
-                places.append(f"[{int(place)}]")
-            elif place[0] == '_':
-                places.append(f'."{place[1:]}"')
-            else:
-                places.append(f".{place}")
+        for command in commands:
+            if command.strip():
+                cursor.execute(command)
 
-        return f"${''.join(places)}"
+        self.connection.commit()
 
-    def field_init(self, field):
-        """
-        Make sure there's auto_increment
-        """
-
-        self.ensure_attribute(field, "auto_increment")
-        self.ensure_attribute(field, "definition")
+        cursor.close()
 
     def model_init(self, model):
         """
@@ -155,297 +115,71 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         self.record_init(model._fields)
 
         self.ensure_attribute(model, "SCHEMA")
-        self.ensure_attribute(model, "TABLE")
-        self.ensure_attribute(model, "QUERY")
-        self.ensure_attribute(model, "DEFINITION")
+        self.ensure_attribute(model, "STORE")
 
-        model.UNDEFINE.append("QUERY")
+        if model.SCHEMA is None:
+            model.SCHEMA = self.schema
 
-        if model.TABLE is None:
-            model.TABLE = model.NAME
+        if model.STORE is None:
+            model.STORE = model.NAME
 
-        if model.QUERY is None:
-            model.QUERY = relations.query.Query(selects='*', froms=self.table(model))
-
-        if model._id is not None and model._fields._names[model._id].auto_increment is None:
-            model._fields._names[model._id].auto_increment = True
+        if model._id is not None and model._fields._names[model._id].auto is None and model._fields._names[model._id].kind == int:
             model._fields._names[model._id].auto = True
 
-    @staticmethod
-    def column_define(field): #pylint: disable=too-many-branches
+    def model_define(self, migration=None, definition=None):
         """
-        Defines just the column for field
-        """
-
-        if field.get('definition') is not None:
-            return field['definition']
-
-        definition = [f"`{field['store']}`"]
-
-        default = None
-
-        if field['kind'] == 'bool':
-
-            definition.append("TINYINT")
-
-            if field.get('default') is not None:
-                default = f"DEFAULT {int(field['default'])}"
-
-        elif field['kind'] == 'int':
-
-            definition.append("BIGINT")
-
-            if field.get('default') is not None:
-                default = f"DEFAULT {field['default']}"
-
-        elif field['kind'] == 'float':
-
-            definition.append("DOUBLE")
-
-            if field.get('default') is not None:
-                default = f"DEFAULT {field['default']}"
-
-        elif field['kind'] == 'str':
-
-            length = field['length'] if field.get('length') is not None else 255
-
-            definition.append(f"VARCHAR({length})")
-
-            if field.get('default') is not None:
-                default = f"DEFAULT '{field['default']}'"
-
-        else:
-
-            definition.append("JSON")
-
-        if not field['none']:
-            definition.append("NOT NULL")
-
-        if field.get('auto_increment'):
-            definition.append("AUTO_INCREMENT")
-
-        if default:
-            definition.append(default)
-
-        return " ".join(definition)
-
-    def extract_define(self, store, path, kind):
-        """
-        Createa and extract store
+        Creates the DDL for a model
         """
 
-        definition = [f"`{store}__{path}`"]
+        ddl = self.TABLE(migration, definition)
+        ddl.generate(indent=2)
 
-        if kind == 'bool':
-            definition.append("TINYINT")
-        elif kind == 'int':
-            definition.append("BIGINT")
-        elif kind == 'float':
-            definition.append("DOUBLE")
-        elif kind == 'str':
-            definition.append("VARCHAR(255)")
-        else:
-            definition.append("JSON")
+        return ddl.sql
 
-        definition.append(f"AS (`{store}`->>'{self.walk(path)}')")
-
-        return " ".join(definition)
-
-    def field_define(self, field, definitions, extract=True):
+    def create_query(self, model):
         """
-        Add what this field is the definition
+        Get query for what's being inserted
         """
 
-        if field.get('inject'):
-            return
+        fields = [field.store for field in model._fields._order if not field.auto and not field.inject]
+        query = self.INSERT(self.TABLE_NAME(model.STORE, schema=model.SCHEMA), *fields)
 
-        definitions.append(self.column_define(field))
+        if not model._bulk and model._id is not None and model._fields._names[model._id].auto:
+            if model._mode == "many":
+                raise relations.ModelError(model, "only one create query at a time")
+            return copy.deepcopy(query).VALUES(**model._record.create({})).bind(model)
 
-        if extract:
-            for path in sorted(field.get('extract', {}).keys()):
-                definitions.append(self.extract_define(field['store'], path, field['extract'][path]))
+        for creating in model._each("create"):
+            query.VALUES(**creating._record.create({}))
+
+        return query
 
     @staticmethod
-    def index_define(name, fields, unique=False):
+    def create_id(cursor, model, query):
         """
-        Defines an index
-        """
-
-        index = 'UNIQUE' if unique else 'INDEX'
-        name = name.replace('-', '_')
-        fields = '`,`'.join(fields)
-
-        return f"{index} `{name}` (`{fields}`)"
-
-    def model_define(self, model):
-        """
-        Defines the model
+        Inserts a single record and sets the id
         """
 
-        if model.get('definition') is not None:
-            return [model['definition']]
+        query.generate()
+        cursor.execute(query.sql, tuple(query.args))
 
-        definitions = []
+        model[model._id] = cursor.lastrowid
 
-        self.record_define(model['fields'], definitions)
-
-        if model.get('id') is not None:
-            definitions.append(f"PRIMARY KEY (`{model['id']}`)")
-
-        for name in sorted(model['unique'].keys()):
-            definitions.append(self.index_define(name, model['unique'][name], unique=True))
-
-        for name in sorted(model['index'].keys()):
-            definitions.append(self.index_define(name, model['index'][name]))
-
-        sep = ',\n  '
-        return [f"CREATE TABLE IF NOT EXISTS {self.table(model)} (\n  {sep.join(definitions)}\n)"]
-
-    def field_add(self, migration, migrations):
-        """
-        add the field
-        """
-
-        if migration.get('inject'):
-            return
-
-        migrations.append(f"ADD {self.column_define(migration)}")
-
-        for path in sorted(migration.get('extract', {}).keys()):
-            migrations.append(f"ADD {self.extract_define(migration['store'], path, migration['extract'][path])}")
-
-    def field_remove(self, definition, migrations):
-        """
-        remove the field
-        """
-
-        if definition.get('inject'):
-            return
-
-        migrations.append(f"DROP `{definition['store']}`")
-
-        for path in sorted(definition.get('extract', {}).keys()):
-            migrations.append(f"DROP `{definition['store']}__{path}`")
-
-    def field_change(self, definition, migration, migrations):
-        """
-        change the field
-        """
-
-        if definition.get('inject'):
-            return
-
-        # This is a little heavy handed but simpler, any changes will be propagated
-
-        migrations.append(f"CHANGE `{definition['store']}` {self.column_define({**definition, **migration})}")
-
-        store = migration.get('store', definition['store'])
-        extract = migration.get('extract', definition.get('extract', {}))
-
-        # Remove all the ones that were there and now aren't
-
-        for path in sorted(definition.get('extract', {}).keys()):
-            if path not in extract:
-                migrations.append(f"DROP `{definition['store']}__{path}`")
-
-        for path in sorted(extract.keys()):
-
-            # Add the ones that are new
-
-            if path not in definition.get("extract"):
-                migrations.append(f"ADD {self.extract_define(store, path, migration['extract'][path])}")
-
-            # if the field name or extract kind has changed, change
-
-            elif definition['store'] != store or definition["extract"][path] != extract[path]:
-                migrations.append(f"CHANGE `{definition['store']}__{path}` {self.extract_define(store, path, extract[path])}")
-
-    def model_add(self, definition):
-        """
-        migrate the model
-        """
-
-        return self.model_define(definition)
-
-    def model_remove(self, definition):
-        """
-        remove the model
-        """
-
-        return [f"DROP TABLE IF EXISTS {self.table(definition)}"]
-
-    def model_change(self, definition, migration):
-        """
-        change the model
-        """
-
-        migrations = []
-
-        definition_table = self.table(definition)
-        migration_table = self.table({
-            "schema": migration.get("schema", definition.get("schema")),
-            "table": migration.get("table", definition["table"])
-        })
-
-        if definition_table != migration_table:
-            migrations.append(f"RENAME TO {migration_table}")
-
-        self.record_change(definition['fields'], migration.get("fields", {}), migrations)
-
-        for name in sorted(migration.get("unique", {}).get("add", {}).keys()):
-            migrations.append(f"ADD {self.index_define(name, migration['unique']['add'][name], unique=True)}")
-
-        for name in sorted(migration.get("unique", {}).get("remove", [])):
-            migrations.append(f"DROP INDEX `{name.replace('-', '_')}`")
-
-        for name in sorted(migration.get("unique", {}).get("rename", {}).keys()):
-            migrations.append(f"RENAME INDEX `{name.replace('-', '_')}` TO `{migration['unique']['rename'][name].replace('-', '_')}`")
-
-        for name in sorted(migration.get("index", {}).get("add", {}).keys()):
-            migrations.append(f"ADD {self.index_define(name, migration['index']['add'][name])}")
-
-        for name in sorted(migration.get("index", {}).get("remove", [])):
-            migrations.append(f"DROP INDEX `{name.replace('-', '_')}`")
-
-        for name in sorted(migration.get("index", {}).get("rename", {}).keys()):
-            migrations.append(f"RENAME INDEX `{name.replace('-', '_')}` TO `{migration['index']['rename'][name].replace('-', '_')}`")
-
-        sep = ',\n  '
-        return [f"ALTER TABLE {definition_table}\n  {sep.join(migrations)}"]
-
-    def field_create(self, field, fields, clause):
-        """
-        Adds values to clause if not auto
-        """
-
-        if not field.auto and not field.inject:
-            fields.append(f"`{field.store}`")
-            clause.append(f"%({field.store})s")
-
-    def model_create(self, model):
+    def model_create(self, model, query=None):
         """
         Executes the create
         """
 
         cursor = self.connection.cursor()
 
-        # Create the insert query
-
-        fields = []
-        clause = []
-
-        self.record_create(model._fields, fields, clause)
-
-        query = f"INSERT INTO {self.table(model)} ({','.join(fields)}) VALUES({','.join(clause)})"
-
-        if not model._bulk and model._id is not None and model._fields._names[model._id].auto_increment:
+        if not model._bulk and model._id is not None and model._fields._names[model._id].auto:
             for creating in model._each("create"):
-                cursor.execute(query, self.encode(creating, creating._record.create({})))
-                creating[model._id] = cursor.lastrowid
+                create_query = query or self.create_query(creating)
+                self.create_id(cursor, creating, create_query)
         else:
-            cursor.executemany(query, [
-                self.encode(creating, creating._record.create({})) for creating in model._each("create")
-            ])
+            create_query = query or self.create_query(model)
+            create_query.generate()
+            cursor.execute(create_query.sql, tuple(create_query.args))
 
         cursor.close()
 
@@ -466,81 +200,17 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return model
 
-    def field_retrieve(self, field, query, values): # pylint: disable=too-many-branches,too-many-statements
+    def field_retrieve(self, field, query):
         """
         Adds where caluse to query
         """
 
         for operator, value in (field.criteria or {}).items():
+            name = f"{field.store}__{operator}"
+            extracted = operator.rsplit("__", 1)[0] in (field.extract or {})
+            query.WHERE(self.OP(name, value, EXTRACTED=extracted))
 
-            walked = None
-
-            if operator not in relations.Field.OPERATORS:
-
-                path, operator = operator.rsplit("__", 1)
-
-                if path in (field.extract or {}):
-
-                    store = store = f'`{field.store}__{path}`'
-
-                else:
-
-                    walked = self.walk(path)
-                    values.append(walked)
-                    store = f"`{field.store}`->>%s"
-
-            else:
-
-                store = f"`{field.store}`"
-
-            if operator == "in":
-                if value:
-                    query.add(wheres=f"{store} IN ({','.join(['%s' for _ in value])})")
-                    values.extend(sorted(value))
-                else:
-                    query.add(wheres="FALSE")
-            elif operator == "ne":
-                if value:
-                    query.add(wheres=f"{store} NOT IN ({','.join(['%s' for _ in value])})")
-                    values.extend(sorted(value))
-                else:
-                    query.add(wheres="TRUE")
-            elif operator == "like":
-                query.add(wheres=f'{store} LIKE %s')
-                values.append(f"%{value}%")
-            elif operator == "notlike":
-                query.add(wheres=f'{store} NOT LIKE %s')
-                values.append(f"%{value}%")
-            elif operator == "null":
-                query.add(wheres=f'{store} {"IS" if value else "IS NOT"} NULL')
-            elif operator == "has":
-                query.add(wheres=f"JSON_CONTAINS({store}, %s)")
-                values.append(json.dumps(sorted(value)))
-            elif operator == "any":
-                contains = []
-                for index, each in enumerate(sorted(value)):
-                    contains.append(f"JSON_CONTAINS({store}, %s)")
-                    if index and walked is not None:
-                        values.append(walked)
-                    values.append(json.dumps(each))
-                query.add(wheres=f"({' OR '.join(contains)})")
-            elif operator == "all":
-                query.add(wheres=f"JSON_CONTAINS({store}, %s)")
-                values.append(json.dumps(sorted(value)))
-                query.add(wheres=f"JSON_LENGTH({store})=%s")
-                if walked is not None:
-                    values.append(walked)
-                values.append(len(value))
-            else:
-                if isinstance(value, (bool, int, float, str)):
-                    query.add(wheres=f"{store}{self.RETRIEVE[operator]}%s")
-                    values.append(value)
-                else:
-                    query.add(wheres=f"{store}{self.RETRIEVE[operator]}CAST(%s AS JSON)")
-                    values.append(json.dumps(sorted(value) if isinstance(value, set) else value))
-
-    @classmethod
-    def model_like(cls, model, query, values):
+    def like(self, model, query):
         """
         Adds like information to the query
         """
@@ -548,7 +218,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if model._like is None:
             return
 
-        ors = []
+        labels = self.OR()
 
         for name in model._label:
 
@@ -563,8 +233,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
                 if field.name == relation.child_field:
                     parent = relation.Parent.many(like=model._like).limit(model._chunk)
                     if parent[relation.parent_field]:
-                        ors.append(f'`{field.store}` IN ({",".join(["%s" for _ in parent[relation.parent_field]])})')
-                        values.extend(parent[relation.parent_field])
+                        labels(self.IN(field.store, parent[relation.parent_field]))
                         model.overflow = model.overflow or parent.overflow
                     else:
                         parent = True
@@ -574,79 +243,83 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
                 paths = path if path else field.label
 
                 if paths:
-
                     for path in paths:
-
-                        if path in (field.extract or {}):
-
-                            ors.append(f'`{field.store}__{path}` LIKE %s')
-                            values.append(f"%{model._like}%")
-
-                        else:
-
-                            ors.append(f"`{field.store}`->>%s LIKE %s")
-                            values.append(cls.walk(path))
-                            values.append(f"%{model._like}%")
-
+                        labels(self.LIKE(f"{field.store}__{path}", model._like, extracted=path in (field.extract or {})))
                 else:
+                    labels(self.LIKE(field.store, model._like))
 
-                    ors.append(f'`{field.store}` LIKE %s')
-                    values.append(f"%{model._like}%")
+        if labels:
+            query.WHERE(labels)
 
-        query.add(wheres="(%s)" % " OR ".join(ors))
-
-    @staticmethod
-    def model_sort(model, query):
+    def sort(self, model, query):
         """
         Adds sort information to the query
         """
 
-        sort = model._sort or model._order
-
-        if sort:
-            order_bys = []
-            for field in sort:
-                order_bys.append(f'`{field[1:]}`' if field[0] == "+" else f'`{field[1:]}` DESC')
-            query.add(order_bys=order_bys)
+        for field in (model._sort or model._order or []):
+            query.ORDER_BY(**{field[1:]: (self.ASC if field[0] == "+" else self.DESC)})
 
         model._sort = None
 
     @staticmethod
-    def model_limit(model, query, values):
+    def limit(model, query):
         """
         Adds sort informaiton to the query
         """
 
-        if model._limit is None:
-            return
-
         if model._limit is not None:
-            if model._offset:
-                query.add(limits="%s, %s")
-                values.extend([model._offset, model._limit])
-            else:
-                query.add(limits="%s")
-                values.append(model._limit)
+            query.LIMIT(model._limit)
 
-    def model_count(self, model):
+        if model._offset:
+            query.LIMIT(model._offset)
+
+    def count_query(self, model):
+        """
+        Get query for what's being inserted
+        """
+
+        query = self.SELECT(self.AS("total", self.SQL("COUNT(*)"))).FROM(self.TABLE_NAME(model.STORE, schema=model.SCHEMA))
+
+        model._collate()
+        self.record_retrieve(model._record, query)
+        self.like(model, query)
+
+        return query
+
+    def retrieve_query(self, model):
+        """
+        Get query for what's being inserted
+        """
+
+        query = self.count_query(model)
+
+        query.FIELDS = self.FIELDS("*")
+
+        self.sort(model, query)
+        self.limit(model, query)
+
+        return query
+
+    def labels_query(self, model):
+        """
+        Get query for what's being selected
+        """
+
+        return self.retrieve_query(model)
+
+    def model_count(self, model, query=None):
         """
         Executes the count
         """
 
-        model._collate()
-
         cursor = self.connection.cursor()
 
-        query = copy.deepcopy(model.QUERY)
-        query.set(selects="COUNT(*) AS total")
+        if query is None:
+            query = self.count_query(model)
 
-        values = []
+        query.generate()
 
-        self.record_retrieve(model._record, query, values)
-
-        self.model_like(model, query, values)
-
-        cursor.execute(query.get(), values)
+        cursor.execute(query.sql, query.args)
 
         total = cursor.fetchone()["total"] if cursor.rowcount else 0
 
@@ -654,25 +327,30 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return total
 
-    def model_retrieve(self, model, verify=True):
+    @staticmethod
+    def values_retrieve(model, values):
+        """
+        Encodes the fields in json if needed
+        """
+        for field in model._fields._order:
+            if isinstance(values.get(field.store), str) and field.kind not in [bool, int, float, str]:
+                values[field.store] = json.loads(values[field.store])
+
+        return values
+
+    def model_retrieve(self, model, verify=True, query=None):
         """
         Executes the retrieve
         """
 
-        model._collate()
-
         cursor = self.connection.cursor()
 
-        query = copy.deepcopy(model.QUERY)
-        values = []
+        if query is None:
+            query = self.retrieve_query(model)
 
-        self.record_retrieve(model._record, query, values)
+        query.generate()
 
-        self.model_like(model, query, values)
-        self.model_sort(model, query)
-        self.model_limit(model, query, values)
-
-        cursor.execute(query.get(), values)
+        cursor.execute(query.sql, tuple(query.args))
 
         if model._mode == "one" and cursor.rowcount > 1:
             raise relations.ModelError(model, "more than one retrieved")
@@ -685,14 +363,14 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
                     raise relations.ModelError(model, "none retrieved")
                 return None
 
-            model._record = model._build("update", _read=self.decode(model, cursor.fetchone()))
+            model._record = model._build("update", _read=self.values_retrieve(model, cursor.fetchone()))
 
         else:
 
             model._models = []
 
             while len(model._models) < cursor.rowcount:
-                model._models.append(model.__class__(_read=self.decode(model, cursor.fetchone())))
+                model._models.append(model.__class__(_read=self.values_retrieve(model, cursor.fetchone())))
 
             if model._limit is not None:
                 model.overflow = model.overflow or len(model._models) >= model._limit
@@ -705,13 +383,13 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return model
 
-    def model_labels(self, model):
+    def model_labels(self, model, query=None):
         """
         Creates the labels structure
         """
 
         if model._action == "retrieve":
-            self.model_retrieve(model)
+            self.model_retrieve(model, query=query)
 
         labels = relations.Labels(model)
 
@@ -720,19 +398,43 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return labels
 
-    def field_update(self, field, updates, clause, values):
+    def field_update(self, field, updates, query):
         """
-        Preps values from dict
+        Adds fields to update clause
         """
 
-        if field.store in updates:
-            clause.append(f"`{field.store}`=%s")
-            if field.kind not in [bool, int, float, str] and updates[field.store] is not None:
-                values.append(json.dumps(updates[field.store]))
-            else:
-                values.append(updates[field.store])
+        if field.store in updates and not field.auto:
+            query.SET(**{field.store: updates[field.store]})
 
-    def model_update(self, model):
+    def update_query(self, model):
+        """
+        Create the update query
+        """
+
+        query = self.UPDATE(self.TABLE_NAME(model.STORE, schema=model.SCHEMA))
+
+        if model._action == "retrieve" and model._record._action == "update":
+
+            self.record_update(model._record, model._record.mass({}), query)
+
+        elif model._id:
+
+            if model._mode == "many":
+                raise relations.ModelError(model, "only one update query at a time")
+
+            self.record_update(model._record, model._record.update({}), query)
+
+            query.WHERE(**{model._fields._names[model._id].store: model[model._id]})
+
+        else:
+
+            raise relations.ModelError(model, "nothing to update from")
+
+        self.record_retrieve(model._record, query)
+
+        return query
+
+    def model_update(self, model, query=None):
         """
         Executes the update
         """
@@ -745,42 +447,22 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         if model._action == "retrieve" and model._record._action == "update":
 
-            # Build the SET clause first
+            update_query = query or self.update_query(model)
 
-            clause = []
-            values = []
-
-            self.record_update(model._record, model._record.mass({}), clause, values)
-
-            # Build the WHERE clause next
-
-            where = relations.query.Query()
-            self.record_retrieve(model._record, where, values)
-
-            query = f"UPDATE {self.table(model)} SET {relations.sql.assign_clause(clause)} {where.get()}"
-
-            cursor.execute(query, values)
-
+            update_query.generate()
+            cursor.execute(update_query.sql, update_query.args)
             updated = cursor.rowcount
 
         elif model._id:
 
-            store = model._fields._names[model._id].store
-
             for updating in model._each("update"):
 
-                clause = []
-                values = []
+                update_query = query or self.update_query(updating)
 
-                self.record_update(updating._record, updating._record.update({}), clause, values)
+                if update_query.SET:
 
-                if clause:
-
-                    values.append(updating[model._id])
-
-                    query = f"UPDATE {self.table(model)} SET {relations.sql.assign_clause(clause)} WHERE `{store}`=%s"
-
-                    cursor.execute(query, values)
+                    update_query.generate()
+                    cursor.execute(update_query.sql, update_query.args)
 
                 for parent_child in updating.CHILDREN:
                     if updating._children.get(parent_child):
@@ -794,36 +476,42 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         return updated
 
-    def model_delete(self, model):
+    def delete_query(self, model):
+        """
+        Create the update query
+        """
+
+        query = self.DELETE(self.TABLE_NAME(model.STORE, schema=model.SCHEMA))
+
+        if model._action == "retrieve":
+
+            self.record_retrieve(model._record, query)
+
+        elif model._id:
+
+            ids = []
+            store = model._fields._names[model._id].store
+            for deleting in model._each():
+                ids.append(deleting[model._id])
+            query.WHERE(**{f"{store}__in": ids})
+
+        else:
+
+            raise relations.ModelError(model, "nothing to delete from")
+
+        return query
+
+    def model_delete(self, model, query=None):
         """
         Executes the delete
         """
 
         cursor = self.connection.cursor()
 
-        if model._action == "retrieve":
+        delete_query = query or self.delete_query(model)
 
-            where = relations.query.Query()
-            values = []
-            self.record_retrieve(model._record, where, values)
-
-            query = f"DELETE FROM {self.table(model)} {where.get()}"
-
-        elif model._id:
-
-            store = model._fields._names[model._id].store
-            values = []
-
-            for deleting in model._each():
-                values.append(deleting[model._id])
-
-            query = f"DELETE FROM {self.table(model)} WHERE `{store}` IN ({','.join(['%s'] * len(values))})"
-
-        else:
-
-            raise relations.ModelError(model, "nothing to delete from")
-
-        cursor.execute(query, values)
+        delete_query.generate()
+        cursor.execute(delete_query.sql, tuple(delete_query.args))
 
         return cursor.rowcount
 
@@ -838,13 +526,12 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             definition = json.load(definition_file)
             for name in sorted(definition.keys()):
                 if definition[name]["source"] == self.name:
-                    definitions.extend(self.model_define(definition[name]))
+                    definitions.append(self.model_define(definition[name]))
 
         if definitions:
             file_name = file_path.split("/")[-1].split('.')[0]
             with open(f"{source_path}/{file_name}.sql", "w") as source_file:
-                source_file.write(";\n\n".join(definitions))
-                source_file.write(";\n")
+                source_file.write("\n".join(definitions))
 
     def migration_convert(self, file_path, source_path):
         """"
@@ -858,41 +545,22 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
             for add in sorted(migration.get('add', {}).keys()):
                 if migration['add'][add]["source"] == self.name:
-                    migrations.extend(self.model_add(migration['add'][add]))
+                    migrations.append(self.model_define(migration['add'][add]))
 
             for remove in sorted(migration.get('remove', {}).keys()):
                 if migration['remove'][remove]["source"] == self.name:
-                    migrations.extend(self.model_remove(migration['remove'][remove]))
+                    migrations.append(self.model_define(definition=migration['remove'][remove]))
 
             for change in sorted(migration.get('change', {}).keys()):
                 if migration['change'][change]['definition']["source"] == self.name:
-                    migrations.extend(
-                        self.model_change(migration['change'][change]['definition'], migration['change'][change]['migration'])
+                    migrations.append(
+                        self.model_define(migration['change'][change]['migration'], migration['change'][change]['definition'])
                     )
 
         if migrations:
             file_name = file_path.split("/")[-1].split('.')[0]
             with open(f"{source_path}/{file_name}.sql", "w") as source_file:
-                source_file.write(";\n\n".join(migrations))
-                source_file.write(";\n")
-
-    def execute(self, commands):
-        """
-        Execute one or more commands
-        """
-
-        if not isinstance(commands, list):
-            commands = [commands]
-
-        cursor = self.connection.cursor()
-
-        for command in commands:
-            if command.strip():
-                cursor.execute(command)
-
-        self.connection.commit()
-
-        cursor.close()
+                source_file.write("\n".join(migrations))
 
     def load(self, load_path):
         """
@@ -900,7 +568,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         """
 
         with open(load_path, 'r') as load_file:
-            self.execute(load_file.read().split(";\n"))
+            self.execute(load_file.read())
 
     def list(self, source_path):
         """
@@ -924,50 +592,46 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Migrate all the existing files to where we are
         """
 
+        class Migration(relations.Model):
+            """
+            Model for migrations
+            """
+
+            SOURCE = self.name
+            STORE = "_relations_migration"
+            UNIQUE = False
+
+            stamp = str
+
         migrated = False
 
-        cursor = self.connection.cursor()
+        self.execute(Migration.define())
 
-        cursor.execute("""
-            SELECT COUNT(*) AS `migration`
-            FROM information_schema.tables
-            WHERE table_schema = %s AND table_name = %s
-        """, (self.schema, "_relations_migration"))
-
-        stamps = cursor.fetchone()['migration']
+        stamps = Migration.many().stamp
 
         migration_paths = sorted(glob.glob(f"{source_path}/migration-*.sql"))
 
-        table = self.table({"table": "_relations_migration"})
-
         if not stamps:
 
-            cursor.execute(f"""
-                CREATE TABLE {table} (
-                    `stamp` VARCHAR(255) NOT NULL,
-                    PRIMARY KEY (`stamp`)
-                );
-            """)
+            migration = Migration().bulk().add("definition")
 
+            for migration_path in migration_paths:
+                stamp = migration_path.rsplit("/migration-", 1)[-1].split('.')[0]
+                migration.add(stamp)
+
+            migration.create()
+            self.connection.commit()
             self.load(f"{source_path}/definition.sql")
             migrated = True
 
         else:
 
-            cursor.execute(f"SELECT `stamp` FROM {table} ORDER BY `stamp`")
-
-            stamps = [row['stamp'] for row in cursor.fetchall()]
-
             for migration_path in migration_paths:
-                if migration_path.rsplit("/migration-", 1)[-1].split('.')[0] not in stamps:
+                stamp = migration_path.rsplit("/migration-", 1)[-1].split('.')[0]
+                if stamp not in stamps:
+                    Migration(stamp).create()
+                    self.connection.commit()
                     self.load(migration_path)
                     migrated = True
-
-        for migration_path in migration_paths:
-            stamp = migration_path.rsplit("/migration-", 1)[-1].split('.')[0]
-            if not stamps or stamp not in stamps:
-                cursor.execute(f"INSERT INTO {table} VALUES (%s)", (stamp, ))
-
-        self.connection.commit()
 
         return migrated
