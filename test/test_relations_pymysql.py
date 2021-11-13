@@ -173,7 +173,7 @@ class TestSource(unittest.TestCase):
         self.assertEqual(name["Field"], "name")
         self.assertEqual(name["Type"], "varchar(255)")
 
-    def test_model_init(self):
+    def test_init(self):
 
         class Check(relations.Model):
             id = int
@@ -181,15 +181,15 @@ class TestSource(unittest.TestCase):
 
         model = Check()
 
-        self.source.model_init(model)
+        self.source.init(model)
 
         self.assertEqual(model.SCHEMA, "test_source")
         self.assertEqual(model.STORE, "check")
         self.assertTrue(model._fields._names["id"].auto)
 
-    def test_model_define(self):
+    def test_define(self):
 
-        self.assertEqual(self.source.model_define(Simple.thy().define()),
+        self.assertEqual(self.source.define(Simple.thy().define()),
 """CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
   `id` BIGINT AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
@@ -199,7 +199,7 @@ class TestSource(unittest.TestCase):
 """)
 
         cursor = self.source.connection.cursor()
-        cursor.execute(self.source.model_define(Simple.thy().define()))
+        cursor.execute(self.source.define(Simple.thy().define()))
         cursor.close()
 
     def test_create_query(self):
@@ -238,7 +238,7 @@ class TestSource(unittest.TestCase):
 
         cursor.close()
 
-    def test_model_create(self):
+    def test_create(self):
 
         simple = Simple("sure")
         simple.plain.add("fine")
@@ -285,13 +285,13 @@ class TestSource(unittest.TestCase):
 
         cursor.close()
 
-    def test_field_retrieve(self):
+    def test_retrieve_field(self):
 
         field = relations.Field(int, name="id")
         self.source.field_init(field)
         field.filter(1)
         query = self.source.SELECT()
-        self.source.field_retrieve(field, query)
+        self.source.retrieve_field(field, query)
         query.generate()
         self.assertEqual(query.sql, """SELECT WHERE `id`=%s""")
         self.assertEqual(query.args, [1])
@@ -300,7 +300,7 @@ class TestSource(unittest.TestCase):
         self.source.field_init(field)
         field.filter({"a": 1})
         query = self.source.SELECT()
-        self.source.field_retrieve(field, query)
+        self.source.retrieve_field(field, query)
         query.generate()
         self.assertEqual(query.sql, """SELECT WHERE `things`=CAST(%s AS JSON)""")
         self.assertEqual(query.args, ['{"a": 1}'])
@@ -309,7 +309,7 @@ class TestSource(unittest.TestCase):
         self.source.field_init(field)
         field.filter("yes", "a__b")
         query = self.source.SELECT()
-        self.source.field_retrieve(field, query)
+        self.source.retrieve_field(field, query)
         query.generate()
         self.assertEqual(query.sql, """SELECT WHERE `things`->>%s=%s""")
         self.assertEqual(query.args, ['$.a.b', 'yes'])
@@ -318,7 +318,7 @@ class TestSource(unittest.TestCase):
         self.source.field_init(field)
         field.filter("yes", "for__0____1")
         query = self.source.SELECT()
-        self.source.field_retrieve(field, query)
+        self.source.retrieve_field(field, query)
         query.generate()
         self.assertEqual(query.sql, """SELECT WHERE `things__for__0____1`=%s""")
         self.assertEqual(query.args, ['yes'])
@@ -575,7 +575,7 @@ ORDER BY
 LIMIT %s""")
         self.assertEqual(query.args, [2, '%p%', 5])
 
-    def test_model_count(self):
+    def test_count(self):
 
         self.source.execute(Unit.define())
         self.source.execute(Test.define())
@@ -630,7 +630,7 @@ LIMIT %s""")
             "things": {}
         })
 
-    def test_model_retrieve(self):
+    def test_retrieve(self):
 
         self.source.execute(Unit.define())
         self.source.execute(Test.define())
@@ -795,7 +795,7 @@ LIMIT %s""")
         model = Net.many(subnet__max_value=int(ipaddress.IPv4Address('1.2.3.0')))
         self.assertEqual(len(model), 0)
 
-    def test_model_labels(self):
+    def test_labels(self):
 
         self.source.execute(Unit.define())
         self.source.execute(Test.define())
@@ -839,13 +839,13 @@ LIMIT %s""")
             1: ["1.2.3.4"]
         })
 
-    def test_field_update(self):
+    def test_update_field(self):
 
         # Standard
 
         field = relations.Field(int, name="id")
         query = self.source.UPDATE("table")
-        self.source.field_update(field, {"id": 1}, query)
+        self.source.update_field(field, {"id": 1}, query)
         query.generate()
         self.assertEqual(query.sql, """UPDATE `table` SET `id`=%s""")
         self.assertEqual(query.args, [1])
@@ -854,7 +854,7 @@ LIMIT %s""")
 
         field = relations.Field(dict, name="id")
         query = self.source.UPDATE("table")
-        self.source.field_update(field, {"id": {"a": 1}}, query)
+        self.source.update_field(field, {"id": {"a": 1}}, query)
         query.generate()
         self.assertEqual(query.sql, """UPDATE `table` SET `id`=CAST(%s AS JSON)""")
         self.assertEqual(query.args, ['{"a": 1}'])
@@ -863,7 +863,7 @@ LIMIT %s""")
 
         field = relations.Field(dict, name="id")
         query = self.source.UPDATE("table")
-        self.source.field_update(field, {}, query)
+        self.source.update_field(field, {}, query)
         query.generate()
         self.assertEqual(query.sql, """UPDATE `table`""")
         self.assertEqual(query.args, [])
@@ -895,7 +895,7 @@ LIMIT %s""")
 
         self.assertRaisesRegex(relations.ModelError, "nothing to update from", model.query)
 
-    def test_model_update(self):
+    def test_update(self):
 
         self.source.execute(Unit.define())
         self.source.execute(Test.define())
@@ -969,7 +969,7 @@ LIMIT %s""")
 
         self.assertRaisesRegex(relations.ModelError, "nothing to delete from", model.query, "delete")
 
-    def test_model_delete(self):
+    def test_delete(self):
 
         self.source.execute(Unit.define())
         self.source.execute(Test.define())
@@ -993,7 +993,7 @@ LIMIT %s""")
         plain = Plain(0, "nope").create()
         self.assertRaisesRegex(relations.ModelError, "plain: nothing to delete from", plain.delete)
 
-    def test_definition_convert(self):
+    def test_definition(self):
 
         with open("ddl/general.json", 'w') as ddl_file:
             json.dump({
@@ -1003,7 +1003,7 @@ LIMIT %s""")
 
         os.makedirs("ddl/sourced", exist_ok=True)
 
-        self.source.definition_convert("ddl/general.json", "ddl/sourced")
+        self.source.definition("ddl/general.json", "ddl/sourced")
 
         with open("ddl/sourced/general.sql", 'r') as ddl_file:
             self.assertEqual(ddl_file.read(),
@@ -1021,7 +1021,7 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
 );
 """)
 
-    def test_migration_convert(self):
+    def test_migration(self):
 
         with open("ddl/general.json", 'w') as ddl_file:
             json.dump({
@@ -1040,7 +1040,7 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
 
         os.makedirs("ddl/sourced", exist_ok=True)
 
-        self.source.migration_convert("ddl/general.json", "ddl/sourced")
+        self.source.migration("ddl/general.json", "ddl/sourced")
 
         with open("ddl/sourced/general.sql", 'r') as ddl_file:
             self.assertEqual(ddl_file.read(),
