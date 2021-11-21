@@ -48,7 +48,7 @@ setup:
 	apk update && apk add git && \
 	pip install git+https://github.com/relations-dil/python-relations.git@0.6.6#egg=python-relations && \
 	pip install git+https://github.com/relations-dil/python-relations-sql.git@0.6.2#egg=python-relations-sql && \
-	pip install git+https://github.com/relations-fil/python-relations-mysql.git@0.3.0#egg=python-relations-mysql && \
+	pip install git+https://github.com/relations-dil/python-relations-mysql.git@0.3.0#egg=python-relations-mysql && \
 	python setup.py install && \
 	python -m relations_pymysql"
 
