@@ -167,7 +167,7 @@ class TestSource(unittest.TestCase):
 
         id = cursor.fetchone()
         self.assertEqual(id["Field"], "id")
-        self.assertEqual(id["Type"], "bigint(20)")
+        self.assertEqual(id["Type"], "bigint")
 
         name = cursor.fetchone()
         self.assertEqual(name["Field"], "name")

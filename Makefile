@@ -1,9 +1,9 @@
 ACCOUNT=gaf3
 IMAGE=python-relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.6.3
+VERSION?=0.6.4
 NETWORK=relations.io
-MYSQL_IMAGE=mysql/mysql-server:5.7
+MYSQL_IMAGE=mysql:8.0.28-oracle
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
 DEBUG_PORT=5678
 TTY=$(shell if tty -s; then echo "-it"; fi)
