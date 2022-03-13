@@ -46,9 +46,9 @@ lint:
 setup:
 	docker run $(TTY) $(VOLUMES) $(INSTALL) sh -c "cp -r /opt/service /opt/install && cd /opt/install/ && \
 	apk update && apk add git && \
-	pip install git+https://github.com/relations-dil/python-relations.git@3f8ce8b#egg=python-relations && \
-	pip install git+https://github.com/relations-dil/python-relations-sql.git@15e3ad4#egg=python-relations-sql && \
-	pip install git+https://github.com/relations-dil/python-relations-mysql.git@5a450e9#egg=python-relations-mysql && \
+	pip install git+https://github.com/relations-dil/python-relations.git@0.6.8#egg=python-relations && \
+	pip install git+https://github.com/relations-dil/python-relations-sql.git@0.6.4#egg=python-relations-sql && \
+	pip install git+https://github.com/relations-dil/python-relations-mysql.git@0.5.0#egg=python-relations-mysql && \
 	python setup.py install && \
 	python -m relations_pymysql"
 
