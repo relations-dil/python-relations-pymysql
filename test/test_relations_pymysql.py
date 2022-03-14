@@ -1053,7 +1053,7 @@ CREATE TABLE IF NOT EXISTS `test_source`.`simple` (
 
 DROP TABLE IF EXISTS `test_source`.`simple`;
 
-RENAME TABLE `test_source`.`simple` TO `simples`;
+RENAME TABLE `test_source`.`simple` TO `test_source`.`simples`;
 """)
 
     def test_load(self):
