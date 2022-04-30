@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 setup(
     name="python-relations-pymysql",
-    version="0.6.6",
+    version="0.6.7",
     package_dir = {'': 'lib'},
     py_modules = [
         'relations_pymysql'
