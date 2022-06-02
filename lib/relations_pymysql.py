@@ -70,9 +70,13 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             thread = threading.get_ident()
 
             if thread not in self.connections:
-                self.connections[thread] = pymysql.connect(
-                    cursorclass=pymysql.cursors.DictCursor, **self.kwargs
-                )
+                available = set(self.connections.keys()) - {thread.ident for thread in threading.enumerate() if thread.is_alive()}
+                if available:
+                    self.connections[thread] = self.connections[available.pop()]
+                else:
+                    self.connections[thread] = pymysql.connect(
+                        cursorclass=pymysql.cursors.DictCursor, **self.kwargs
+                    )
 
             return self.connections[thread]
 

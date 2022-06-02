@@ -131,6 +131,10 @@ class TestSource(unittest.TestCase):
         del source.connections[threading.get_ident()]
         self.assertTrue(source.connection)
 
+        source.connections[0] = source.connection
+        del source.connections[threading.get_ident()]
+        self.assertTrue(source.connection)
+
         def disconnect():
 
             source.disconnection
