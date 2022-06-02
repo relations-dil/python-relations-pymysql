@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=python-relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.6.8
+VERSION?=0.6.9
 NETWORK=relations.io
 MYSQL_IMAGE=mysql:8.0.28-oracle
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
