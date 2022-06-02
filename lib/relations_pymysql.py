@@ -53,6 +53,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         self.schema = schema
         self.kwargs = {name: arg for name, arg in kwargs.items() if name not in ["name", "schema", "connection"]}
+        self.lock = threading.Lock()
         self.connections = {}
 
         if connection is not None:
@@ -70,13 +71,22 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             thread = threading.get_ident()
 
             if thread not in self.connections:
-                available = set(self.connections.keys()) - {thread.ident for thread in threading.enumerate() if thread.is_alive()}
-                if available:
-                    self.connections[thread] = self.connections[available.pop()]
-                else:
+
+                try:
+
+                    self.lock.acquire()
+
+                    for dead in set(self.connections.keys()) - {alive.ident for alive in threading.enumerate()}:
+                        self.connections[dead].close()
+                        del self.connections[dead]
+
                     self.connections[thread] = pymysql.connect(
                         cursorclass=pymysql.cursors.DictCursor, **self.kwargs
                     )
+
+                finally:
+
+                    self.lock.release()
 
             return self.connections[thread]
 
