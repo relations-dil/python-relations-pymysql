@@ -1,8 +1,8 @@
-# python-relations-pymysql
+# relations-pymysql
 
 DB Modeling for MySQL using the PyMySQL library
 
-Relations is designed to be a simple, straight forward, flexible DIL (data interface layer).
+Relations overall is designed to be a simple, straight forward, flexible DIL (data interface layer).
 
 Quite different from other DIL's, it has the singular, microservice based purpose to:
 - Create models with very little code, independent of backends
@@ -18,6 +18,8 @@ You should only need to define the model once. Your conceptual structure is the 
 Furthermore, the conceptual structure is based not the backend of what you've going to use at that moment of time (scaling matters) but on the relations, how the pieces interact. If you know the structure of the data, that's all you need to interact with the data.
 
 So with Relations, Models and Fields are defined independent of any backend, which instead is set at runtime. So the API will use a DB, everything else will use that API.
+
+This is just the MySQL bandend of models and what not.
 
 Don't have great docs yet so I've included some of the unittests to show what's possible.
 
