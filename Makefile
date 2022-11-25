@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=python-relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.6.11
+VERSION?=0.6.12
 NETWORK=relations.io
 MYSQL_IMAGE=mysql:8.0.28-oracle
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
@@ -21,6 +21,7 @@ ENVIRONMENT=-e MYSQL_HOST=$(MYSQL_HOST) \
 PYPI=-v ${PWD}/LICENSE.txt:/opt/service/LICENSE.txt \
 	-v ${PWD}/PYPI.md:/opt/service/README.md \
 	-v ${HOME}/.pypirc:/opt/service/.pypirc
+
 .PHONY: build network mysql shell debug test lint setup tag untag testpypi pypi
 
 build:
