@@ -19,7 +19,7 @@ Furthermore, the conceptual structure is based not the backend of what you've go
 
 So with Relations, Models and Fields are defined independent of any backend, which instead is set at runtime. So the API will use a DB, everything else will use that API.
 
-This is just the MySQL bandend of models and what not.
+This is just the MySQL backend of models and what not.
 
 Don't have great docs yet so I've included some of the unittests to show what's possible.
 
