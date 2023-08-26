@@ -155,7 +155,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Get query for what's being inserted
         """
 
-        fields = [field.store for field in model._fields._order if not field.auto and not field.inject]
+        fields = [field.store for field in model._fields._order if not field.auto and not field.inject and field.store]
         query = self.INSERT(self.TABLE_NAME(model.STORE, schema=model.SCHEMA), *fields)
 
         if not model._bulk and model._id is not None and model._fields._names[model._id].auto:
@@ -184,6 +184,8 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Executes the create
         """
 
+        super().create(model)
+
         cursor = self.connection.cursor()
 
         if not model._bulk and model._id is not None and model._fields._names[model._id].auto:
@@ -200,6 +202,9 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         if not model._bulk:
 
             for creating in model._each("create"):
+
+                self.create_ties(creating)
+
                 for parent_child in creating.CHILDREN:
                     if creating._children.get(parent_child):
                         creating._children[parent_child].create()

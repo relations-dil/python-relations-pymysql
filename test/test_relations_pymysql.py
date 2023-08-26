@@ -85,6 +85,23 @@ class Case(SourceModel):
 relations.OneToMany(Unit, Test)
 relations.OneToOne(Test, Case)
 
+class Sis(SourceModel):
+    id = int
+    name = str
+    bro_id = set
+
+class Bro(SourceModel):
+    id = int
+    name = str
+    sis_id = set
+
+class SisBro(SourceModel):
+    ID = None
+    bro_id = int
+    sis_id = int
+
+relations.ManyToMany(Sis, Bro, SisBro)
+
 class TestSource(unittest.TestCase):
 
     maxDiff = None
@@ -223,6 +240,12 @@ class TestSource(unittest.TestCase):
         model = Simple([["sure"], ["fine"]])
         self.assertRaisesRegex(relations.ModelError, "only one create query at a time", model.query)
 
+        query = Sis("sure", bro_id=[1, 2, 3]).query()
+        query.generate()
+
+        self.assertEqual(query.sql, """INSERT INTO `test_source`.`sis` (`name`) VALUES (%s)""")
+        self.assertEqual(query.args, ["sure"])
+
     def test_create_id(self):
 
         self.source.execute(Simple.define())
@@ -286,6 +309,22 @@ class TestSource(unittest.TestCase):
             "things": {"for": [{"1": "yep"}]},
             "things__for__0____1": "yep"
         })
+
+        sis = Sis("Sally", bro_id=[2, 3, 4], _bulk=True)
+        self.assertRaisesRegex(relations.ModelError, "cannot create ties in bulk", sis.create)
+
+        self.source.execute(Sis.define())
+        self.source.execute(Bro.define())
+        self.source.execute(SisBro.define())
+
+        sis = Sis("Sally", bro_id=[2, 3, 4]).create()
+
+        cursor.execute("SELECT * FROM test_source.sis_bro ORDER BY bro_id")
+        self.assertEqual(cursor.fetchall(), [
+            {"sis_id": sis.id, "bro_id": 2},
+            {"sis_id": sis.id, "bro_id": 3},
+            {"sis_id": sis.id, "bro_id": 4}
+        ])
 
         cursor.close()
 
