@@ -1017,8 +1017,13 @@ LIMIT %s""")
         self.assertEqual(Net.one(ping.id).ip.compressed, "13.14.15.16")
         self.assertEqual(Net.one(pong.id).ip.compressed, "5.6.7.8")
 
-        sis = Sis.many(name="Sally").set(bro_id=[1, 2, 3])
-        self.assertRaisesRegex(relations.ModelError, "cannot update ties in retrieve mode", sis.update)
+        Sis("Sally").create()
+        bro = Bro("Harry").create()
+        Sis.many(name="Sally").set(bro_id=[bro.id]).update()
+
+        sis = Sis.one(name="Sally")
+
+        self.assertEqual(Bro.one(name="Harry").sis.id, [sis.id])
 
         tom = Bro("Tom").create()
         dick = Bro("Dick").create()
@@ -1089,7 +1094,13 @@ LIMIT %s""")
         plain = Plain(0, "nope").create()
         self.assertRaisesRegex(relations.ModelError, "plain: nothing to delete from", plain.delete)
 
-        self.assertRaisesRegex(relations.ModelError, "cannot delete ties in retrieve mode", Sis.many().delete)
+        Sis("Sally").create()
+        bro = Bro("Harry").create()
+        Sis.many(name="Sally").set(bro_id=[bro.id]).update()
+
+        Sis.one(name="Sally").delete()
+
+        self.assertEqual(Bro.one(name="Harry").sis.id, [])
 
         tom = Bro("Tom").create()
         dick = Bro("Dick").create()
@@ -1103,11 +1114,12 @@ LIMIT %s""")
         tom.update()
         dot.update()
 
-        dick.delete()
-        nikki.delete()
+        dick.one(name="Dick").retrieve().delete()
+        nikki.one(name="Nikki").retrieve().delete()
 
         self.assertEqual(Bro.one(name="Tom").sis.id, [dot.id])
         self.assertEqual(Sis.one(name="Dot").bro.id, [tom.id])
+        self.assertEqual(SisBro.many().count(), 1)
 
     def test_definition(self):
 

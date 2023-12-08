@@ -203,7 +203,8 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
             for creating in model._each("create"):
 
-                self.create_ties(creating)
+                if model._id:
+                    self.create_ties(creating)
 
                 for parent_child in creating.CHILDREN:
                     if creating._children.get(parent_child):
@@ -464,8 +465,6 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Executes the update
         """
 
-        super().update(model)
-
         cursor = self.connection.cursor()
 
         updated = 0
@@ -476,9 +475,29 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
             update_query = query or self.update_query(model)
 
-            update_query.generate()
-            cursor.execute(update_query.sql, update_query.args)
-            updated = cursor.rowcount
+            if update_query.SET.expressions:
+
+                update_query.generate()
+                cursor.execute(update_query.sql, update_query.args)
+                updated = cursor.rowcount
+
+            ties = model._record.tie({})
+
+            if ties:
+
+                store_id = model._fields._names[model._id].store
+
+                id_query = self.SELECT(store_id, WHERE=update_query.WHERE).FROM(self.TABLE_NAME(model.STORE, schema=model.SCHEMA))
+
+                id_query.generate()
+
+                cursor.execute(id_query.sql, id_query.args)
+                ids = [row[store_id] for row in cursor.fetchall()]
+
+                self.delete_ties(model, ids)
+                self.create_ties(model, ties, ids)
+
+                updated = len(ids)
 
         elif model._id:
 
@@ -523,6 +542,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
             store = model._fields._names[model._id].store
             for deleting in model._each():
                 ids.append(deleting[model._id])
+
             query.WHERE(**{f"{store}__in": ids})
 
         else:
@@ -536,8 +556,6 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
         Executes the delete
         """
 
-        super().delete(model)
-
         cursor = self.connection.cursor()
 
         if model._action == "retrieve":
@@ -548,7 +566,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
             delete_query = self.delete_query(model)
 
-            for deleting in model._each("delete"):
+            for deleting in model._each():
                 if self.has_ties(deleting):
                     self.delete_ties(deleting)
 
