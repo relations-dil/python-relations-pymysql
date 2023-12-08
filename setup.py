@@ -7,15 +7,15 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name="relations-pymysql",
-    version="0.6.12",
+    version="0.6.13",
     package_dir = {'': 'lib'},
     py_modules = [
         'relations_pymysql'
     ],
     install_requires=[
         'PyMySQL==0.10.0',
-        'relations-dil>=0.6.12',
-        'relations-mysql>=0.6.3'
+        'relations-dil>=0.6.14',
+        'relations-mysql>=0.6.4'
     ],
     url="https://github.com/relations-dil/python-relations-pymysql",
     author="Gaffer Fitch",
