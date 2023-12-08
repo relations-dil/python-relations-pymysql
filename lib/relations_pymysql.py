@@ -562,6 +562,19 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
             delete_query = query or self.delete_query(model)
 
+            if model._id:
+
+                store_id = model._fields._names[model._id].store
+
+                id_query = self.SELECT(store_id, WHERE=delete_query.WHERE).FROM(self.TABLE_NAME(model.STORE, schema=model.SCHEMA))
+
+                id_query.generate()
+
+                cursor.execute(id_query.sql, id_query.args)
+                ids = [row[store_id] for row in cursor.fetchall()]
+
+                self.delete_ties(model, ids)
+
         elif model._id:
 
             delete_query = self.delete_query(model)
@@ -576,7 +589,6 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
         delete_query.generate()
         cursor.execute(delete_query.sql, tuple(delete_query.args))
-
         return cursor.rowcount
 
     def definition(self, file_path, source_path):

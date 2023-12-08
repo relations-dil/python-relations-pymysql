@@ -1098,7 +1098,7 @@ LIMIT %s""")
         bro = Bro("Harry").create()
         Sis.many(name="Sally").set(bro_id=[bro.id]).update()
 
-        Sis.one(name="Sally").delete()
+        Sis.many(name="Sally").delete()
 
         self.assertEqual(Bro.one(name="Harry").sis.id, [])
 
@@ -1114,8 +1114,8 @@ LIMIT %s""")
         tom.update()
         dot.update()
 
-        dick.one(name="Dick").retrieve().delete()
-        nikki.one(name="Nikki").retrieve().delete()
+        Bro.many(name="Dick").delete()
+        Sis.many(name="Nikki").delete()
 
         self.assertEqual(Bro.one(name="Tom").sis.id, [dot.id])
         self.assertEqual(Sis.one(name="Dot").bro.id, [tom.id])
