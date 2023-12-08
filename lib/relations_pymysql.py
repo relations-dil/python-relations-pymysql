@@ -505,7 +505,7 @@ class Source(relations.Source): # pylint: disable=too-many-public-methods
 
                 update_query = query or self.update_query(updating)
 
-                if update_query.SET:
+                if update_query.SET.expressions:
 
                     update_query.generate()
                     cursor.execute(update_query.sql, update_query.args)

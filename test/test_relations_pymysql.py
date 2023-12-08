@@ -1101,6 +1101,7 @@ LIMIT %s""")
         Sis.many(name="Sally").delete()
 
         self.assertEqual(Bro.one(name="Harry").sis.id, [])
+        self.assertEqual(SisBro.many().count(), 0)
 
         tom = Bro("Tom").create()
         dick = Bro("Dick").create()
@@ -1114,8 +1115,8 @@ LIMIT %s""")
         tom.update()
         dot.update()
 
-        Bro.many(name="Dick").delete()
-        Sis.many(name="Nikki").delete()
+        Bro.one(name="Dick").retrieve().delete()
+        Sis.one(name="Nikki").retrieve().delete()
 
         self.assertEqual(Bro.one(name="Tom").sis.id, [dot.id])
         self.assertEqual(Sis.one(name="Dot").bro.id, [tom.id])
