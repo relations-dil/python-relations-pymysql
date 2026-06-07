@@ -2,9 +2,9 @@ ACCOUNT=gaf3
 IMAGE=python-relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
 VERSION?=0.6.13
-NETWORK=relations.io
+NETWORK?=relations.io
 MYSQL_IMAGE=mysql:8.0.28-oracle
-MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql
+MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql-$(NETWORK)
 DEBUG_PORT=5678
 TTY=$(shell if tty -s; then echo "-it"; fi)
 VOLUMES=-v ${PWD}/lib:/opt/service/lib \
@@ -42,7 +42,7 @@ debug: mysql
 	docker run $(TTY) --network=$(NETWORK) $(VOLUMES) $(ENVIRONMENT) -p 127.0.0.1:$(DEBUG_PORT):5678 $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "python -m ptvsd --host 0.0.0.0 --port 5678 --wait -m unittest discover -v test"
 
 test: mysql
-	docker run $(TTY) --network=$(NETWORK) $(VOLUMES) $(ENVIRONMENT) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "coverage run -m unittest discover -v test && coverage report -m --include 'lib/*.py'"
+	docker run $(TTY) --rm --network=$(NETWORK) $(VOLUMES) $(ENVIRONMENT) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "coverage run -m unittest discover -v test && coverage report -m --include 'lib/*.py'" ; status=$$? ; docker rm --force $(MYSQL_HOST) ; [ "$(NETWORK)" = "relations.io" ] || docker network rm $(NETWORK) ; exit $$status
 
 lint:
 	docker run $(TTY) $(VOLUMES) $(ENVIRONMENT) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "pylint --rcfile=.pylintrc lib/"
