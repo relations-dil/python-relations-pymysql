@@ -7,7 +7,7 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name="relations-pymysql",
-    version="0.6.13",
+    version="0.6.14",
     package_dir = {'': 'lib'},
     py_modules = [
         'relations_pymysql'
