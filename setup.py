@@ -21,7 +21,7 @@ setup(
     ],
     install_requires=[
         'PyMySQL==0.10.0',
-        'relations-dil>=0.6.14',
+        'relations-dil>=0.6.16',
         'relations-mysql>=0.6.4'
     ],
     url="https://github.com/relations-dil/python-relations-pymysql",
