@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=python-relations-pymysql
 INSTALL=python:3.8.5-alpine3.12
-VERSION?=0.6.15
+VERSION?=$(shell cat VERSION)
 NETWORK?=relations.io
 MYSQL_IMAGE=mysql:8.0.28-oracle
 MYSQL_HOST=$(ACCOUNT)-$(IMAGE)-mysql-$(NETWORK)
@@ -11,6 +11,7 @@ VOLUMES=-v ${PWD}/lib:/opt/service/lib \
 		-v ${PWD}/test:/opt/service/test \
 		-v ${PWD}/mysql.sh:/opt/service/mysql.sh \
 		-v ${PWD}/.pylintrc:/opt/service/.pylintrc \
+		-v ${PWD}/VERSION:/opt/service/VERSION \
 		-v ${PWD}/setup.py:/opt/service/setup.py
 ENVIRONMENT=-e MYSQL_HOST=$(MYSQL_HOST) \
 			-e MYSQL_PORT=3306 \
@@ -62,10 +63,10 @@ untag:
 
 testpypi:
 	docker run $(TTY) $(VOLUMES) $(PYPI) gaf3/pypi sh -c "cd /opt/service && \
-	python -m build && \
+	BUILD_VERSION='$(VERSION)' python -m build && \
 	python -m twine upload -r testpypi --config-file=.pypirc dist/*"
 
 pypi:
 	docker run $(TTY) $(VOLUMES) $(PYPI) gaf3/pypi sh -c "cd /opt/service && \
-	python -m build && \
+	BUILD_VERSION='$(VERSION)' python -m build && \
 	python -m twine upload --config-file=.pypirc dist/*"
