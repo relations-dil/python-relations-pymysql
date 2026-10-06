@@ -1,4 +1,4 @@
-relations-dil==0.6.15
+relations-dil==0.6.16
 relations-sql==0.6.9
 relations-mysql==0.6.4
 PyMySQL==0.10.0
