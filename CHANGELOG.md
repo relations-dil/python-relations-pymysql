@@ -21,6 +21,11 @@ Shipping as 0.6.16, with relations-dil 0.6.16.
 ### Changed
 - A key stored in a dict field (`child_inject` in relations-dil 0.6.16) is queried by its path in that field, instead of a column that doesn't exist: new `retrieve_record` hands the record to `retrieve_field`, which looks an injected field up in the field it's stored in (as the extracted column if it's been extracted), and `sort` does the same. Counting, retrieving, updating and deleting by the key work, and mass updates through it are refused.
 
+## [0.6.17] - 2026-10-14
+
+### Changed
+- Needs relations-dil 0.6.18 and relations-mysql 0.6.5: a string id (caller supplied, a non-int id) is created, read, updated, deleted and tied with its primary key. The source needed no change, the work is in relations-dil, relations-sql and relations-mysql.
+
 ## [0.6.15] - 2026-06-08
 
 - Fixed count and retrieve for many-to-many ties searched through attributes: flat joins now use `COUNT(DISTINCT ...)` and `SELECT DISTINCT` so a model tied to several matching siblings is not repeated.
