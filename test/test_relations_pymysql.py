@@ -267,6 +267,32 @@ class TestSource(unittest.TestCase):
         self.assertEqual(query.sql, """INSERT INTO `test_source`.`sis` (`name`) VALUES (%s)""")
         self.assertEqual(query.args, ["sure"])
 
+    def test_write(self):
+
+        self.source.execute(Simple.define())
+
+        simple = Simple("sure")
+
+        cursor = self.source.connection.cursor()
+
+        # a write that works
+
+        self.source.write(cursor, simple, "INSERT INTO test_source.simple (name) VALUES (%s)", ("one",))
+
+        # a duplicate is core's unique error, with the driver's error as its cause
+
+        with self.assertRaises(relations.UniqueError) as caught:
+            self.source.write(cursor, simple, "INSERT INTO test_source.simple (name) VALUES (%s)", ("one",))
+
+        self.assertEqual(caught.exception.model, simple)
+        self.assertIsInstance(caught.exception.__cause__, pymysql.err.IntegrityError)
+
+        # any other integrity error is left as it is
+
+        self.assertRaises(pymysql.err.IntegrityError, self.source.write, cursor, simple, "INSERT INTO test_source.simple (name) VALUES (%s)", (None,))
+
+        cursor.close()
+
     def test_create_id(self):
 
         self.source.execute(Simple.define())
@@ -283,6 +309,12 @@ class TestSource(unittest.TestCase):
 
         cursor.execute("SELECT * FROM test_source.simple")
         self.assertEqual(cursor.fetchone()["id"], simple.id)
+
+        # a duplicate is core's unique error
+
+        again = Simple("sure")
+
+        self.assertRaises(relations.UniqueError, self.source.create_id, cursor, again, self.source.create_query(again))
 
         cursor.close()
 
@@ -369,6 +401,10 @@ class TestSource(unittest.TestCase):
             {"id": 1, "name": "rex", "what": {"relations": {"owner": {"id": owner.id}}}},
             {"id": 2, "name": "stray", "what": {}}
         ])
+
+        # a duplicate is core's unique error
+
+        self.assertRaises(relations.UniqueError, Simple("sure").create)
 
     def test_retrieve_field(self):
 
@@ -569,10 +605,10 @@ class TestSource(unittest.TestCase):
         Unit([["stuff"], ["people"]]).create()
 
         models = Unit.one(name__in=["people", "stuff"])
-        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+        self.assertRaisesRegex(relations.MultipleError, "unit: more than one retrieved", models.retrieve)
 
         model = Unit.one(name="things")
-        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+        self.assertRaisesRegex(relations.NotFoundError, "unit: none retrieved", model.retrieve)
 
         self.assertIsNone(model.retrieve(False))
 
@@ -614,10 +650,10 @@ WHERE
         Unit([["stuff"], ["people"]]).create()
 
         models = Unit.one(name__in=["people", "stuff"])
-        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+        self.assertRaisesRegex(relations.MultipleError, "unit: more than one retrieved", models.retrieve)
 
         model = Unit.one(name="things")
-        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+        self.assertRaisesRegex(relations.NotFoundError, "unit: none retrieved", model.retrieve)
 
         self.assertIsNone(model.retrieve(False))
 
@@ -662,10 +698,10 @@ LIMIT %s""")
         Unit([["stuff"], ["people"]]).create()
 
         models = Unit.one(name__in=["people", "stuff"])
-        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+        self.assertRaisesRegex(relations.MultipleError, "unit: more than one retrieved", models.retrieve)
 
         model = Unit.one(name="things")
-        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+        self.assertRaisesRegex(relations.NotFoundError, "unit: none retrieved", model.retrieve)
 
         self.assertIsNone(model.retrieve(False))
 
@@ -794,10 +830,10 @@ LIMIT %s""")
         Unit([["stuff"], ["people"]]).create()
 
         models = Unit.one(name__in=["people", "stuff"])
-        self.assertRaisesRegex(relations.ModelError, "unit: more than one retrieved", models.retrieve)
+        self.assertRaisesRegex(relations.MultipleError, "unit: more than one retrieved", models.retrieve)
 
         model = Unit.one(name="things")
-        self.assertRaisesRegex(relations.ModelError, "unit: none retrieved", model.retrieve)
+        self.assertRaisesRegex(relations.NotFoundError, "unit: none retrieved", model.retrieve)
 
         self.assertIsNone(model.retrieve(False))
 
@@ -1307,6 +1343,18 @@ LIMIT %s""")
         self.assertEqual(Pet.one(name="rex").owner_id, pat.id)
 
         self.assertRaisesRegex(relations.FieldError, "no mass update with inject", Pet.many(name="rex").set(owner_id=sam.id).update)
+
+        # a duplicate is core's unique error, for one record and for many
+
+        self.source.execute(Simple.define())
+        self.source.execute(Plain.define())
+
+        Simple("dup one").create()
+        two = Simple("dup two").create()
+
+        two.name = "dup one"
+        self.assertRaises(relations.UniqueError, two.update)
+        self.assertRaises(relations.UniqueError, Simple.many().set(name="same").update)
 
     def test_delete_query(self):
 
