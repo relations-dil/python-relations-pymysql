@@ -244,6 +244,30 @@ class TestSource(unittest.TestCase):
         self.assertEqual([column["Field"] for column in cursor.fetchall()], ["id", "name", "what"])
         cursor.close()
 
+    def test_define_length(self):
+
+        class Sized(SourceModel):
+            id = int
+            name = str, {"length": 64}
+            note = str
+
+        self.assertEqual(self.source.define(Sized.thy().define()),
+"""CREATE TABLE IF NOT EXISTS `test_source`.`sized` (
+  `id` BIGINT AUTO_INCREMENT,
+  `name` VARCHAR(64) NOT NULL,
+  `note` VARCHAR(255),
+  PRIMARY KEY (`id`),
+  UNIQUE `name` (`name`)
+);
+""")
+
+        self.source.execute(Sized.define())
+
+        cursor = self.source.connection.cursor()
+        cursor.execute("DESCRIBE `test_source`.`sized`")
+        self.assertEqual([column["Type"] for column in cursor.fetchall()], ["bigint", "varchar(64)", "varchar(255)"])
+        cursor.close()
+
     def test_create_query(self):
 
         query = Simple("sure").query()
