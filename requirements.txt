@@ -1,6 +1,6 @@
 relations-dil==0.6.19
-relations-sql==0.6.10
-relations-mysql==0.6.5
+relations-sql==0.6.11
+relations-mysql==0.6.6
 PyMySQL==0.10.0
 ptvsd==4.3.2
 coverage==5.2.1
